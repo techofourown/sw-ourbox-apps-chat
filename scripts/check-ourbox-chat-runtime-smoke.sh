@@ -26,6 +26,7 @@ cleanup
 
 docker run -d --rm \
   --name "${CONTAINER_NAME}" \
+  -e OURBOX_CHAT_PORT="tcp://10.43.22.203:8080" \
   -p "127.0.0.1:${PORT}:8080" \
   "${IMAGE_TAG}" >/dev/null
 
