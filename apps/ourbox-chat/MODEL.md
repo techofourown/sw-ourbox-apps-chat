@@ -7,3 +7,9 @@
 
 This repo intentionally bakes the model into the published application image so
 the target does not need to download model bytes after installation.
+
+## View Contract Reference
+
+For swappable web view implementations, use the normative contract in:
+
+- `docs/reference/view-layer-contract.md`
