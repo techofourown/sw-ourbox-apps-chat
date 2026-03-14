@@ -1,0 +1,19 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate script syntax
+        run: bash -n scripts/check-apps-manifest.sh scripts/check-app-builds.sh
+      - name: Validate manifest and source layout
+        run: bash scripts/check-apps-manifest.sh
+      - name: Build application images
+        run: bash scripts/check-app-builds.sh

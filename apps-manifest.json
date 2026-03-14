@@ -1,0 +1,16 @@
+{
+  "schema": 1,
+  "kind": "ourbox-apps-collection",
+  "collection_id": "chat",
+  "display_name": "Chat Apps Publisher",
+  "apps": [
+    {
+      "app_id": "woodbox-chat",
+      "display_name": "Woodbox Chat",
+      "source_path": "apps/woodbox-chat",
+      "image_repo": "ghcr.io/techofourown/sw-ourbox-apps-chat/woodbox-chat",
+      "default_tag": "latest"
+    }
+  ],
+  "notes": "Published chat application images from this repo are intended to be consumed by sw-ourbox-catalog-* repositories."
+}

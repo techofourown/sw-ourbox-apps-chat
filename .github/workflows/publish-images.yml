@@ -1,0 +1,63 @@
+name: Publish Application Images
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        name: Build and publish woodbox-chat
+        uses: docker/build-push-action@v6
+        with:
+          context: ./apps/woodbox-chat
+          push: true
+          tags: |
+            ghcr.io/techofourown/sw-ourbox-apps-chat/woodbox-chat:latest
+            ghcr.io/techofourown/sw-ourbox-apps-chat/woodbox-chat:sha-${{ github.sha }}
+      - name: Write publish record
+        run: |
+          mkdir -p dist
+          python3 - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          record = {
+              "schema": 1,
+              "kind": "ourbox-application-image-publish-record",
+              "app_id": "woodbox-chat",
+              "display_name": "Woodbox Chat",
+              "image_repo": "ghcr.io/techofourown/sw-ourbox-apps-chat/woodbox-chat",
+              "default_tag": "latest",
+              "pinned_ref": f"ghcr.io/techofourown/sw-ourbox-apps-chat/woodbox-chat@{os.environ['DIGEST']}",
+              "digest": os.environ["DIGEST"],
+              "github_sha": os.environ["GITHUB_SHA"],
+              "github_run_id": os.environ["GITHUB_RUN_ID"],
+              "github_run_attempt": os.environ["GITHUB_RUN_ATTEMPT"],
+          }
+          Path("dist/woodbox-chat.publish-record.json").write_text(
+              json.dumps(record, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: woodbox-chat-publish-record
+          path: dist/woodbox-chat.publish-record.json
