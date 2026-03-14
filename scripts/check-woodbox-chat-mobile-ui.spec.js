@@ -53,9 +53,9 @@ for (const viewport of viewports) {
       const systemPanelOpen = await page.locator("#system-panel").evaluate((node) => node.open);
       expect(systemPanelOpen).toBe(false);
 
-      const composerBox = await page.locator(".composer").boundingBox();
-      expect(composerBox).not.toBeNull();
-      expect(composerBox.y + composerBox.height).toBeLessThanOrEqual(viewport.height + 12);
+      const transcriptBox = await page.locator("#transcript").boundingBox();
+      expect(transcriptBox).not.toBeNull();
+      expect(transcriptBox.height).toBeGreaterThanOrEqual(170);
 
       await page.locator("#open-drawer-button").click();
       await page.waitForFunction(() => document.body.classList.contains("drawer-open"));
@@ -154,6 +154,10 @@ test("desktop short viewport scrolls the workspace outside the transcript", asyn
       height: node.scrollHeight,
       client: node.clientHeight,
     }));
+    const transcriptBefore = await page.locator("#transcript").evaluate((node) => ({
+      client: node.clientHeight,
+      height: node.scrollHeight,
+    }));
 
     await page.locator(".workspace-topbar").hover();
     await page.mouse.wheel(0, 700);
@@ -166,6 +170,7 @@ test("desktop short viewport scrolls the workspace outside the transcript", asyn
     }));
 
     expect(before.height).toBeGreaterThan(before.client);
+    expect(transcriptBefore.client).toBeGreaterThanOrEqual(210);
     expect(after.top).toBeGreaterThan(before.top);
 
     await context.close();
