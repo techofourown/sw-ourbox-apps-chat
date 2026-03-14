@@ -113,3 +113,63 @@ for (const viewport of viewports) {
     }
   });
 }
+
+test("desktop short viewport scrolls the workspace outside the transcript", async () => {
+  test.skip(!url, "OURBOX_CHAT_UI_URL is required");
+
+  fs.mkdirSync(artifactsDir, { recursive: true });
+
+  const browser = await chromium.launch({
+    headless: true,
+    executablePath: chromiumBin,
+  });
+
+  try {
+    const context = await browser.newContext({
+      viewport: {
+        width: 1280,
+        height: 520,
+      },
+    });
+    const page = await context.newPage();
+
+    await page.goto(url, {
+      waitUntil: "networkidle",
+      timeout: 120000,
+    });
+    await page.evaluate(() => localStorage.clear());
+    await page.reload({
+      waitUntil: "networkidle",
+      timeout: 120000,
+    });
+
+    await page.waitForFunction(
+      () => document.querySelector("#runtime-status")?.textContent.trim() === "Ready",
+      null,
+      { timeout: 120000 }
+    );
+
+    const before = await page.locator(".workspace").evaluate((node) => ({
+      top: node.scrollTop,
+      height: node.scrollHeight,
+      client: node.clientHeight,
+    }));
+
+    await page.locator(".workspace-topbar").hover();
+    await page.mouse.wheel(0, 700);
+    await page.waitForTimeout(300);
+
+    const after = await page.locator(".workspace").evaluate((node) => ({
+      top: node.scrollTop,
+      height: node.scrollHeight,
+      client: node.clientHeight,
+    }));
+
+    expect(before.height).toBeGreaterThan(before.client);
+    expect(after.top).toBeGreaterThan(before.top);
+
+    await context.close();
+  } finally {
+    await browser.close();
+  }
+});

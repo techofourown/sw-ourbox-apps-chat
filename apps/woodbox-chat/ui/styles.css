@@ -130,7 +130,10 @@ body.drawer-open .sidebar {
     calc(16px + env(safe-area-inset-top, 0px))
     16px
     calc(18px + env(safe-area-inset-bottom, 0px));
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
 }
 
 .sidebar-header,
@@ -220,6 +223,7 @@ body.drawer-open .sidebar {
   appearance: none;
   cursor: pointer;
   font: inherit;
+  touch-action: manipulation;
 }
 
 .primary-button,
@@ -382,6 +386,8 @@ body.drawer-open .sidebar {
   margin-top: 16px;
   overflow: auto;
   padding-right: 4px;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 .thread-item {
@@ -436,6 +442,8 @@ body.drawer-open .sidebar {
   gap: 10px;
   overflow: auto;
   padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
 }
 
 .thread-actions .ghost-button {
@@ -453,6 +461,8 @@ body.drawer-open .sidebar {
   gap: 12px;
   overflow: auto;
   padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
 }
 
 .overview-card {
@@ -571,6 +581,8 @@ body.drawer-open .sidebar {
   gap: 14px;
   overflow: auto;
   padding: 16px 0 10px;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 .message-card {
