@@ -8,13 +8,16 @@ The initial app in this repo is `woodbox-chat`:
 - CPU-only local chat powered by `llama.cpp`
 - bundles a small GGUF model into the image so the target does not download a
   model at install time or first boot
-- exposes the built-in `llama.cpp` web UI over HTTP
+- exposes a custom Woodbox-first web UI over HTTP
+- keeps multiple saved conversation threads in browser storage
+- supports per-thread system prompts, rename, delete, and fork workflows
 - intended to be consumed by `sw-ourbox-catalog-*` repositories
 
 ## Published application
 
 - `woodbox-chat`
   - local chat UI backed by a bundled Qwen 2.5 0.5B instruct GGUF model
+  - saved threads, forkable conversations, rename controls, and system prompt editing
   - image: `ghcr.io/techofourown/sw-ourbox-apps-chat/woodbox-chat`
   - default route: `chat.{box_host}`
   - default port: `8080`

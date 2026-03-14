@@ -15,6 +15,7 @@ need_cmd() {
 
 need_cmd docker
 need_cmd curl
+need_cmd python3
 
 cleanup() {
   docker rm -f "${CONTAINER_NAME}" >/dev/null 2>&1 || true
@@ -62,5 +63,56 @@ grep -q '"object":"list"' "${ROOT}/dist/woodbox-chat-runtime-models.json" || {
   docker logs "${CONTAINER_NAME}" >&2 || true
   exit 1
 }
+
+curl --compressed -fsS "http://127.0.0.1:${PORT}/" >"${ROOT}/dist/woodbox-chat-runtime-ui.html"
+
+grep -q 'data-app="woodbox-chat"' "${ROOT}/dist/woodbox-chat-runtime-ui.html" || {
+  echo "woodbox-chat root page did not serve the custom app shell" >&2
+  docker logs "${CONTAINER_NAME}" >&2 || true
+  exit 1
+}
+
+grep -q "New Thread" "${ROOT}/dist/woodbox-chat-runtime-ui.html" || {
+  echo "woodbox-chat root page did not include the thread UI controls" >&2
+  docker logs "${CONTAINER_NAME}" >&2 || true
+  exit 1
+}
+
+python3 - <<'PY' "http://127.0.0.1:${PORT}/v1/chat/completions" >"${ROOT}/dist/woodbox-chat-runtime-generation.json"
+import json
+import sys
+import urllib.request
+
+request = urllib.request.Request(
+    sys.argv[1],
+    data=json.dumps(
+        {
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "Reply with exactly READY and nothing else.",
+                },
+                {
+                    "role": "user",
+                    "content": "Reply with exactly READY.",
+                },
+            ],
+            "max_tokens": 8,
+            "temperature": 0,
+        }
+    ).encode("utf-8"),
+    headers={"Content-Type": "application/json"},
+)
+
+with urllib.request.urlopen(request, timeout=120) as response:
+    body = response.read().decode("utf-8")
+
+payload = json.loads(body)
+content = payload["choices"][0]["message"]["content"].strip()
+if not content.lower().startswith("ready"):
+    raise SystemExit(f"unexpected generation output: {content!r}")
+
+print(body)
+PY
 
 printf '[%s] woodbox-chat runtime smoke passed\n' "$(date -Is)"
