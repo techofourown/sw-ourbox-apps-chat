@@ -1,9 +1,11 @@
 (function () {
-  const STORAGE_KEY = "ourbox-chat-state-v1";
+  const contract = window.OurBoxChatViewContract || {};
+  const STORAGE_KEY = contract.storageKey || "ourbox-chat-state-v1";
   const MOBILE_BREAKPOINT = 980;
   const DEFAULT_SYSTEM_PROMPT =
-    "You are OurBox Chat, a local assistant running fully on this device. " +
-    "Be direct, practical, and concise. Admit uncertainty when needed.";
+    contract.defaultSystemPrompt ||
+    ("You are OurBox Chat, a local assistant running fully on this device. " +
+      "Be direct, practical, and concise. Admit uncertainty when needed.");
   const PENDING_MESSAGE_ID = "pending-assistant-message";
 
   const elements = {
@@ -169,6 +171,7 @@
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
+        contractVersion: contract.version || "1.0.0",
         threads: state.threads,
         activeThreadId: state.activeThreadId,
       })
@@ -434,12 +437,12 @@
 
   async function probeRuntime() {
     try {
-      const healthResponse = await fetch("/health", { cache: "no-store" });
+      const healthResponse = await fetch((contract.endpoints && contract.endpoints.HEALTH) || "/health", { cache: "no-store" });
       if (!healthResponse.ok) {
         throw new Error("health endpoint returned " + healthResponse.status);
       }
 
-      const modelsResponse = await fetch("/v1/models", { cache: "no-store" });
+      const modelsResponse = await fetch((contract.endpoints && contract.endpoints.MODELS) || "/v1/models", { cache: "no-store" });
       if (!modelsResponse.ok) {
         throw new Error("model listing returned " + modelsResponse.status);
       }
@@ -507,11 +510,11 @@
             };
           })
         ),
-        max_tokens: 256,
-        temperature: 0.7,
+        max_tokens: (contract.limits && contract.limits.DEFAULT_MAX_TOKENS) || 256,
+        temperature: (contract.limits && contract.limits.DEFAULT_TEMPERATURE) || 0.7,
       };
 
-      const response = await fetch("/v1/chat/completions", {
+      const response = await fetch((contract.endpoints && contract.endpoints.CHAT_COMPLETIONS) || "/v1/chat/completions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
