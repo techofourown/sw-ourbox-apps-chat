@@ -48,7 +48,10 @@
     runtimeReady: false,
     runtimeMessage: "Connecting to the bundled local model server.",
     drawerOpen: false,
+    contractListeners: new Set(),
   };
+
+  const VIEW_CONTRACT_VERSION = "1.0.0";
 
   function nowIso() {
     return new Date().toISOString();
@@ -195,6 +198,9 @@
   function setDrawerOpen(shouldOpen) {
     state.drawerOpen = !isDesktopLayout() && shouldOpen;
     syncLayout();
+    emitContractState("ui.drawer.changed", {
+      drawerOpen: state.drawerOpen,
+    });
   }
 
   function closeDrawerIfMobile() {
@@ -362,6 +368,200 @@
     renderWorkspace();
     setComposerBusy(state.requestController !== null);
     syncLayout();
+    emitContractState("state.rendered");
+  }
+
+  function getThreadSnapshot(thread) {
+    return {
+      id: thread.id,
+      title: thread.title,
+      createdAt: thread.createdAt,
+      updatedAt: thread.updatedAt,
+      systemPrompt: thread.systemPrompt,
+      draft: thread.draft,
+      messages: thread.messages.map(function (message) {
+        return {
+          id: message.id,
+          role: message.role,
+          content: message.content,
+          createdAt: message.createdAt,
+        };
+      }),
+    };
+  }
+
+  function getPublicState() {
+    const activeThread = getActiveThread();
+    return {
+      contractVersion: VIEW_CONTRACT_VERSION,
+      runtime: {
+        ready: state.runtimeReady,
+        message: state.runtimeMessage,
+        modelName: state.modelName,
+      },
+      request: {
+        inFlight: state.requestController !== null,
+        threadId: state.requestThreadId,
+      },
+      ui: {
+        drawerOpen: state.drawerOpen,
+        isDesktopLayout: isDesktopLayout(),
+      },
+      activeThreadId: activeThread ? activeThread.id : null,
+      activeThread: activeThread ? getThreadSnapshot(activeThread) : null,
+      threads: state.threads.map(getThreadSnapshot),
+    };
+  }
+
+  function emitContractState(eventType, details) {
+    const payload = {
+      eventType: eventType,
+      at: nowIso(),
+      details: details || null,
+      state: getPublicState(),
+    };
+
+    state.contractListeners.forEach(function (listener) {
+      listener(payload);
+    });
+
+    window.dispatchEvent(new CustomEvent("ourboxchat:state", { detail: payload }));
+  }
+
+  function dispatchContractAction(action) {
+    if (!action || typeof action.type !== "string") {
+      throw new Error("dispatch requires an action object with a type");
+    }
+
+    switch (action.type) {
+      case "THREAD_CREATE": {
+        const thread = createThread();
+        state.threads.unshift(thread);
+        state.activeThreadId = thread.id;
+        persistState();
+        render();
+        closeDrawerIfMobile();
+        emitContractState("thread.created", { threadId: thread.id });
+        return Promise.resolve({ ok: true, threadId: thread.id });
+      }
+      case "THREAD_SELECT": {
+        const threadId = action.payload && action.payload.threadId;
+        const exists = state.threads.some(function (thread) {
+          return thread.id === threadId;
+        });
+        if (!exists) {
+          return Promise.resolve({ ok: false, reason: "thread_not_found" });
+        }
+        state.activeThreadId = threadId;
+        render();
+        closeDrawerIfMobile();
+        emitContractState("thread.selected", { threadId: threadId });
+        return Promise.resolve({ ok: true, threadId: threadId });
+      }
+      case "THREAD_RENAME": {
+        const nextTitle = (action.payload && action.payload.title) || "";
+        renameActiveThread(nextTitle);
+        emitContractState("thread.renamed", { threadId: state.activeThreadId });
+        return Promise.resolve({ ok: true, threadId: state.activeThreadId });
+      }
+      case "THREAD_FORK": {
+        forkActiveThread();
+        emitContractState("thread.forked", { threadId: state.activeThreadId });
+        return Promise.resolve({ ok: true, threadId: state.activeThreadId });
+      }
+      case "THREAD_DELETE": {
+        const previousThreadId = state.activeThreadId;
+        deleteActiveThread();
+        emitContractState("thread.deleted", {
+          deletedThreadId: previousThreadId,
+          activeThreadId: state.activeThreadId,
+        });
+        return Promise.resolve({ ok: true, threadId: state.activeThreadId });
+      }
+      case "THREAD_DRAFT_SET": {
+        const value =
+          action.payload && typeof action.payload.value === "string"
+            ? action.payload.value
+            : "";
+        updateThreadDraft(value);
+        renderWorkspace();
+        emitContractState("thread.draft.updated", {
+          threadId: state.activeThreadId,
+        });
+        return Promise.resolve({ ok: true });
+      }
+      case "THREAD_SYSTEM_PROMPT_SET": {
+        const value =
+          action.payload && typeof action.payload.value === "string"
+            ? action.payload.value
+            : "";
+        updateSystemPrompt(value);
+        emitContractState("thread.system_prompt.updated", {
+          threadId: state.activeThreadId,
+        });
+        return Promise.resolve({ ok: true });
+      }
+      case "MESSAGE_SEND": {
+        if (
+          action.payload &&
+          typeof action.payload.content === "string" &&
+          action.payload.content !== getActiveThread().draft
+        ) {
+          updateThreadDraft(action.payload.content);
+          renderWorkspace();
+        }
+        return sendMessage().then(function () {
+          emitContractState("message.sent", { threadId: state.activeThreadId });
+          return { ok: true };
+        });
+      }
+      case "REQUEST_CANCEL": {
+        if (state.requestController) {
+          state.requestController.abort();
+        }
+        emitContractState("request.cancel.requested", {
+          threadId: state.activeThreadId,
+        });
+        return Promise.resolve({ ok: true });
+      }
+      case "UI_DRAWER_SET_OPEN": {
+        const shouldOpen =
+          action.payload && typeof action.payload.open === "boolean"
+            ? action.payload.open
+            : false;
+        setDrawerOpen(shouldOpen);
+        return Promise.resolve({ ok: true, open: state.drawerOpen });
+      }
+      default:
+        return Promise.resolve({ ok: false, reason: "unknown_action", type: action.type });
+    }
+  }
+
+  function registerViewContract() {
+    window.OurBoxChatViewContract = {
+      version: VIEW_CONTRACT_VERSION,
+      getState: function () {
+        return getPublicState();
+      },
+      subscribe: function (listener) {
+        if (typeof listener !== "function") {
+          throw new Error("subscribe requires a function listener");
+        }
+        state.contractListeners.add(listener);
+        listener({
+          eventType: "subscription.ready",
+          at: nowIso(),
+          details: null,
+          state: getPublicState(),
+        });
+        return function unsubscribe() {
+          state.contractListeners.delete(listener);
+        };
+      },
+      dispatch: function (action) {
+        return dispatchContractAction(action);
+      },
+    };
   }
 
   function renameActiveThread(nextTitle) {
@@ -675,6 +875,7 @@
 
     elements.systemPanel.open = isDesktopLayout();
 
+    registerViewContract();
     attachEvents();
     render();
     probeRuntime();

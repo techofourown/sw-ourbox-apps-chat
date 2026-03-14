@@ -40,6 +40,8 @@ app path for a local chat experience on OurBox.
   - machine-readable description of the published application
 - [apps/ourbox-chat](/techofourown/sw-ourbox-apps-chat/apps/ourbox-chat)
   - image build inputs for the local chat application
+- [docs/view-layer-contract.md](/techofourown/sw-ourbox-apps-chat/docs/view-layer-contract.md)
+  - authoritative public contract for building interchangeable web view layers
 - [.github/workflows/ci.yml](/techofourown/sw-ourbox-apps-chat/.github/workflows/ci.yml)
   - lightweight validation
 - [.github/workflows/publish-images.yml](/techofourown/sw-ourbox-apps-chat/.github/workflows/publish-images.yml)
