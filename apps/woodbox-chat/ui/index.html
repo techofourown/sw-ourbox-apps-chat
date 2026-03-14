@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Woodbox Chat</title>
+    <meta
+      name="description"
+      content="Offline-first local chat for Woodbox with saved threads, forkable conversations, and a tunable system prompt."
+    >
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <div class="app-shell" data-app="woodbox-chat">
+      <aside class="sidebar">
+        <div class="sidebar-top">
+          <div class="brand-lockup">
+            <p class="eyebrow">Offline Local AI</p>
+            <h1>Woodbox Chat</h1>
+            <p class="brand-copy">
+              CPU-first local chat with saved conversation threads and a
+              persistent system prompt.
+            </p>
+          </div>
+          <button class="primary-button" id="new-thread-button" type="button">
+            New Thread
+          </button>
+        </div>
+
+        <section class="status-card">
+          <div class="status-row">
+            <span class="status-label">Runtime</span>
+            <span class="status-pill" id="runtime-status">Checking</span>
+          </div>
+          <div class="status-row">
+            <span class="status-label">Model</span>
+            <span class="status-value" id="model-name">Loading</span>
+          </div>
+          <p class="status-copy" id="status-copy">
+            Connecting to the bundled local model server.
+          </p>
+        </section>
+
+        <section class="thread-section">
+          <div class="thread-section-header">
+            <h2>Threads</h2>
+            <span class="thread-count" id="thread-count">0</span>
+          </div>
+          <div class="thread-list" id="thread-list" aria-live="polite"></div>
+        </section>
+      </aside>
+
+      <main class="workspace">
+        <header class="workspace-header">
+          <div>
+            <p class="eyebrow">Current Conversation</p>
+            <h2 id="thread-title">New Thread</h2>
+            <p class="workspace-copy" id="thread-meta">
+              Start a new conversation and it will be saved locally in this
+              browser.
+            </p>
+          </div>
+
+          <div class="thread-actions">
+            <button class="ghost-button" id="rename-thread-button" type="button">
+              Rename
+            </button>
+            <button class="ghost-button" id="fork-thread-button" type="button">
+              Fork
+            </button>
+            <button class="ghost-button danger-button" id="delete-thread-button" type="button">
+              Delete
+            </button>
+          </div>
+        </header>
+
+        <section class="control-strip">
+          <article class="panel system-panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Behavior</p>
+                <h3>System Message</h3>
+              </div>
+              <p class="panel-copy">
+                Sets how the local model should behave for this thread.
+              </p>
+            </div>
+            <label class="field-label" for="system-prompt-input">
+              Thread system prompt
+            </label>
+            <textarea
+              id="system-prompt-input"
+              class="system-input"
+              rows="5"
+              placeholder="Describe how the assistant should behave."
+            ></textarea>
+          </article>
+
+          <article class="panel notes-panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Workflow</p>
+                <h3>Session Notes</h3>
+              </div>
+            </div>
+            <ul class="notes-list">
+              <li>Threads and messages are saved in this browser.</li>
+              <li>Fork duplicates the current conversation into a new branch.</li>
+              <li>Rename helps keep multiple experiments organized.</li>
+            </ul>
+          </article>
+        </section>
+
+        <section class="panel transcript-panel">
+          <div class="transcript-toolbar">
+            <div>
+              <p class="eyebrow">Transcript</p>
+              <h3>Conversation History</h3>
+            </div>
+            <button class="ghost-button" id="clear-composer-button" type="button">
+              Clear Draft
+            </button>
+          </div>
+
+          <div class="transcript" id="transcript" aria-live="polite"></div>
+
+          <form class="composer" id="composer-form">
+            <label class="field-label" for="composer-input">
+              Message
+            </label>
+            <textarea
+              id="composer-input"
+              class="composer-input"
+              rows="4"
+              placeholder="Ask something about your Woodbox, a task, or the local system."
+            ></textarea>
+            <div class="composer-footer">
+              <p class="hint-text">
+                Press <kbd>Enter</kbd> to send. Use <kbd>Shift</kbd> +
+                <kbd>Enter</kbd> for a new line.
+              </p>
+              <div class="composer-actions">
+                <button class="ghost-button" id="cancel-request-button" type="button" disabled>
+                  Stop
+                </button>
+                <button class="primary-button" id="send-button" type="submit">
+                  Generate Reply
+                </button>
+              </div>
+            </div>
+          </form>
+        </section>
+      </main>
+    </div>
+
+    <dialog class="dialog" id="rename-dialog">
+      <form class="dialog-card" id="rename-form" method="dialog">
+        <div class="dialog-header">
+          <p class="eyebrow">Thread</p>
+          <h3>Rename Conversation</h3>
+        </div>
+        <label class="field-label" for="rename-input">Thread name</label>
+        <input id="rename-input" class="rename-input" maxlength="80" type="text">
+        <div class="dialog-actions">
+          <button class="ghost-button" id="rename-cancel-button" type="button">
+            Cancel
+          </button>
+          <button class="primary-button" type="submit">Save Name</button>
+        </div>
+      </form>
+    </dialog>
+
+    <template id="thread-item-template">
+      <button class="thread-item" type="button">
+        <span class="thread-item-title"></span>
+        <span class="thread-item-meta"></span>
+        <span class="thread-item-snippet"></span>
+      </button>
+    </template>
+
+    <template id="message-template">
+      <article class="message-card">
+        <div class="message-header">
+          <span class="message-role"></span>
+          <span class="message-time"></span>
+        </div>
+        <div class="message-body"></div>
+      </article>
+    </template>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>

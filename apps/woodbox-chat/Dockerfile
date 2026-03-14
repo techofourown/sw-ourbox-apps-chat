@@ -11,6 +11,7 @@ RUN mkdir -p /models /app
 ADD https://huggingface.co/Qwen/Qwen2.5-0.5B-Instruct-GGUF/resolve/main/qwen2.5-0.5b-instruct-q4_k_m.gguf /models/qwen2.5-0.5b-instruct-q4_k_m.gguf
 
 COPY entrypoint.sh /app/entrypoint.sh
+COPY ui /app/ui
 
 RUN chmod +x /app/entrypoint.sh
 
