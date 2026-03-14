@@ -3,8 +3,32 @@ const path = require("path");
 const { test, expect, chromium } = require("playwright/test");
 
 const url = process.env.OURBOX_CHAT_UI_URL;
-const chromiumBin = process.env.CHROMIUM_BIN || "/snap/bin/chromium";
 const artifactsDir = process.env.OURBOX_CHAT_UI_ARTIFACTS_DIR || "dist";
+const commonChromiumPaths = [
+  "/usr/bin/chromium",
+  "/usr/bin/chromium-browser",
+  "/usr/bin/google-chrome",
+  "/opt/homebrew/bin/chromium",
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "/snap/bin/chromium",
+];
+
+function chromiumLaunchOptions() {
+  const executablePath =
+    process.env.CHROMIUM_BIN ||
+    commonChromiumPaths.find(function (candidate) {
+      return fs.existsSync(candidate);
+    });
+
+  return executablePath
+    ? {
+        headless: true,
+        executablePath: executablePath,
+      }
+    : {
+        headless: true,
+      };
+}
 
 const viewports = [
   { name: "phone-390x844", width: 390, height: 844 },
@@ -17,10 +41,7 @@ for (const viewport of viewports) {
 
     fs.mkdirSync(artifactsDir, { recursive: true });
 
-    const browser = await chromium.launch({
-      headless: true,
-      executablePath: chromiumBin,
-    });
+    const browser = await chromium.launch(chromiumLaunchOptions());
 
     try {
       const context = await browser.newContext({
@@ -119,10 +140,7 @@ test("desktop short viewport scrolls the workspace outside the transcript", asyn
 
   fs.mkdirSync(artifactsDir, { recursive: true });
 
-  const browser = await chromium.launch({
-    headless: true,
-    executablePath: chromiumBin,
-  });
+  const browser = await chromium.launch(chromiumLaunchOptions());
 
   try {
     const context = await browser.newContext({

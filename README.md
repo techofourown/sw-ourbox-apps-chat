@@ -3,7 +3,7 @@
 `sw-ourbox-apps-chat` publishes a small local-LLM chat application image for
 OurBox.
 
-The initial app in this repo is `woodbox-chat`:
+The initial app in this repo is `ourbox-chat`:
 
 - CPU-only local chat powered by `llama.cpp`
 - bundles a small GGUF model into the image so the target does not download a
@@ -15,11 +15,11 @@ The initial app in this repo is `woodbox-chat`:
 
 ## Published application
 
-- `woodbox-chat`
+- `ourbox-chat`
   - local chat UI backed by a bundled Qwen 2.5 0.5B instruct GGUF model
   - saved threads, forkable conversations, rename controls, and system prompt editing
   - product name: `OurBox Chat`
-  - image: `ghcr.io/techofourown/sw-ourbox-apps-chat/woodbox-chat`
+  - image: `ghcr.io/techofourown/sw-ourbox-apps-chat/ourbox-chat`
   - default route: `chat.{box_host}`
   - default port: `8080`
 
@@ -38,7 +38,7 @@ app path for a local chat experience on OurBox.
 
 - [apps-manifest.json](/techofourown/sw-ourbox-apps-chat/apps-manifest.json)
   - machine-readable description of the published application
-- [apps/woodbox-chat](/techofourown/sw-ourbox-apps-chat/apps/woodbox-chat)
+- [apps/ourbox-chat](/techofourown/sw-ourbox-apps-chat/apps/ourbox-chat)
   - image build inputs for the local chat application
 - [.github/workflows/ci.yml](/techofourown/sw-ourbox-apps-chat/.github/workflows/ci.yml)
   - lightweight validation

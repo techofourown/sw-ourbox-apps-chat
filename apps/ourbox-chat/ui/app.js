@@ -1,5 +1,5 @@
 (function () {
-  const STORAGE_KEY = "woodbox-chat-state-v1";
+  const STORAGE_KEY = "ourbox-chat-state-v1";
   const MOBILE_BREAKPOINT = 980;
   const DEFAULT_SYSTEM_PROMPT =
     "You are OurBox Chat, a local assistant running fully on this device. " +

@@ -5,10 +5,10 @@
   "display_name": "Chat Apps Publisher",
   "apps": [
     {
-      "app_id": "woodbox-chat",
+      "app_id": "ourbox-chat",
       "display_name": "OurBox Chat",
-      "source_path": "apps/woodbox-chat",
-      "image_repo": "ghcr.io/techofourown/sw-ourbox-apps-chat/woodbox-chat",
+      "source_path": "apps/ourbox-chat",
+      "image_repo": "ghcr.io/techofourown/sw-ourbox-apps-chat/ourbox-chat",
       "default_tag": "latest"
     }
   ],
