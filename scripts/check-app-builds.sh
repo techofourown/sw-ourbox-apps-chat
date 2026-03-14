@@ -11,6 +11,12 @@ command -v docker >/dev/null 2>&1 || {
   echo "required command not found: docker" >&2
   exit 1
 }
+command -v curl >/dev/null 2>&1 || {
+  echo "required command not found: curl" >&2
+  exit 1
+}
+
+mkdir -p "${ROOT}/dist"
 
 python3 - <<'PY' "${ROOT}/apps-manifest.json" "${ROOT}"
 import json
@@ -30,5 +36,7 @@ for app in manifest["apps"]:
         check=True,
     )
 PY
+
+bash "${ROOT}/scripts/check-woodbox-chat-runtime-smoke.sh"
 
 printf '[%s] app build smoke passed\n' "$(date -Is)"

@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-exec llama-server \
+exec /app/llama-server \
   -m "${MODEL_PATH}" \
   --host "${WOODBOX_CHAT_HOST:-0.0.0.0}" \
   --port "${WOODBOX_CHAT_PORT:-8080}" \
