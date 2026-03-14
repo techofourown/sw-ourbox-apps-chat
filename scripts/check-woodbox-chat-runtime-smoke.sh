@@ -29,20 +29,36 @@ docker run -d --rm \
   "${IMAGE_TAG}" >/dev/null
 
 for _ in $(seq 1 60); do
-  if curl -fsS "http://127.0.0.1:${PORT}/" >"${ROOT}/dist/woodbox-chat-runtime-home.html" 2>/dev/null; then
+  if curl -fsS "http://127.0.0.1:${PORT}/health" >"${ROOT}/dist/woodbox-chat-runtime-health.json" 2>/dev/null; then
     break
   fi
   sleep 2
 done
 
-test -f "${ROOT}/dist/woodbox-chat-runtime-home.html" || {
+test -f "${ROOT}/dist/woodbox-chat-runtime-health.json" || {
   echo "woodbox-chat runtime did not become ready" >&2
   docker logs "${CONTAINER_NAME}" >&2 || true
   exit 1
 }
 
-grep -qi "llama" "${ROOT}/dist/woodbox-chat-runtime-home.html" || {
-  echo "woodbox-chat home page did not contain an expected llama marker" >&2
+grep -q '"status":"ok"' "${ROOT}/dist/woodbox-chat-runtime-health.json" || {
+  echo "woodbox-chat health endpoint did not report ok" >&2
+  docker logs "${CONTAINER_NAME}" >&2 || true
+  exit 1
+}
+
+curl -fsSI "http://127.0.0.1:${PORT}/health" >"${ROOT}/dist/woodbox-chat-runtime-health.headers"
+
+grep -qi '^Server: llama\.cpp' "${ROOT}/dist/woodbox-chat-runtime-health.headers" || {
+  echo "woodbox-chat health endpoint did not advertise the llama.cpp server header" >&2
+  docker logs "${CONTAINER_NAME}" >&2 || true
+  exit 1
+}
+
+curl -fsS "http://127.0.0.1:${PORT}/v1/models" >"${ROOT}/dist/woodbox-chat-runtime-models.json"
+
+grep -q '"object":"list"' "${ROOT}/dist/woodbox-chat-runtime-models.json" || {
+  echo "woodbox-chat models endpoint did not return the expected model listing" >&2
   docker logs "${CONTAINER_NAME}" >&2 || true
   exit 1
 }
