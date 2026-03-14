@@ -66,13 +66,13 @@ grep -q '"object":"list"' "${ROOT}/dist/woodbox-chat-runtime-models.json" || {
 
 curl --compressed -fsS "http://127.0.0.1:${PORT}/" >"${ROOT}/dist/woodbox-chat-runtime-ui.html"
 
-grep -q 'data-app="woodbox-chat"' "${ROOT}/dist/woodbox-chat-runtime-ui.html" || {
+grep -q 'data-app="ourbox-chat"' "${ROOT}/dist/woodbox-chat-runtime-ui.html" || {
   echo "woodbox-chat root page did not serve the custom app shell" >&2
   docker logs "${CONTAINER_NAME}" >&2 || true
   exit 1
 }
 
-grep -q "New Thread" "${ROOT}/dist/woodbox-chat-runtime-ui.html" || {
+grep -q "OurBox Chat" "${ROOT}/dist/woodbox-chat-runtime-ui.html" || {
   echo "woodbox-chat root page did not include the thread UI controls" >&2
   docker logs "${CONTAINER_NAME}" >&2 || true
   exit 1
