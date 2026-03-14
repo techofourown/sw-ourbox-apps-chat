@@ -30,7 +30,7 @@ RUN chmod +x /app/entrypoint.sh
 
 ENV MODEL_PATH=/models/qwen2.5-0.5b-instruct-q4_k_m.gguf \
     OURBOX_CHAT_HOST=0.0.0.0 \
-    OURBOX_CHAT_PORT=8080 \
+    OURBOX_CHAT_LISTEN_PORT=8080 \
     OURBOX_CHAT_CTX_SIZE=2048 \
     OURBOX_CHAT_THREADS=4 \
     OURBOX_CHAT_N_GPU_LAYERS=0 \

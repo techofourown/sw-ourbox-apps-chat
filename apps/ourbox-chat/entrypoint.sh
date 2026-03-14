@@ -1,10 +1,37 @@
 #!/bin/sh
 set -eu
 
+resolve_listen_port() {
+  case "${OURBOX_CHAT_LISTEN_PORT:-}" in
+    "")
+      case "${OURBOX_CHAT_PORT:-}" in
+        "")
+          printf '%s\n' "8080"
+          ;;
+        *[!0-9]*)
+          printf '%s\n' "8080"
+          ;;
+        *)
+          printf '%s\n' "${OURBOX_CHAT_PORT}"
+          ;;
+      esac
+      ;;
+    *[!0-9]*)
+      printf '%s\n' "invalid OURBOX_CHAT_LISTEN_PORT: ${OURBOX_CHAT_LISTEN_PORT}" >&2
+      exit 64
+      ;;
+    *)
+      printf '%s\n' "${OURBOX_CHAT_LISTEN_PORT}"
+      ;;
+  esac
+}
+
+LISTEN_PORT="$(resolve_listen_port)"
+
 exec /app/llama-server \
   -m "${MODEL_PATH}" \
   --host "${OURBOX_CHAT_HOST:-0.0.0.0}" \
-  --port "${OURBOX_CHAT_PORT:-8080}" \
+  --port "${LISTEN_PORT}" \
   --path /app/ui \
   -c "${OURBOX_CHAT_CTX_SIZE:-2048}" \
   -t "${OURBOX_CHAT_THREADS:-4}" \
