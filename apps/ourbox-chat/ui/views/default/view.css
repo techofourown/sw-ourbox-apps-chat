@@ -63,8 +63,9 @@ body::before {
   pointer-events: none;
 }
 
-body.drawer-open {
-  overflow: hidden;
+#ourbox-chat-root.ourbox-chat-view-root {
+  display: block;
+  min-height: 100vh;
 }
 
 .app-shell {
@@ -116,7 +117,7 @@ body.drawer-open {
   backdrop-filter: blur(18px);
 }
 
-body.drawer-open .sidebar {
+.ourbox-chat-view-root.drawer-open .sidebar {
   transform: translateX(0);
 }
 
@@ -790,10 +791,6 @@ kbd {
 }
 
 @media (min-width: 980px) {
-  body.drawer-open {
-    overflow: auto;
-  }
-
   .app-shell {
     display: grid;
     grid-template-columns: minmax(300px, var(--sidebar-width)) minmax(0, 1fr);
