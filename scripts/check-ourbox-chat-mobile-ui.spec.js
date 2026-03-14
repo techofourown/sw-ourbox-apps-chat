@@ -109,7 +109,7 @@ test("browser contract surface is mounted and request.send resolves after accept
 
     expect(surface.contractId).toBe("ourbox-chat.view-layer");
     expect(surface.contractVersion).toBe("1.0.0");
-    expect(surface.viewId).toBe("default");
+    expect(surface.viewId).toBe("mobile-native");
     expect(surface.createOk).toBe(true);
     expect(surface.threadCountAfter).toBe(surface.threadCountBefore + 1);
     expect(surface.sendOk).toBe(true);
@@ -187,9 +187,6 @@ for (const viewport of viewports) {
         { timeout: 120000 }
       );
 
-      const systemPanelOpen = await page.locator("#system-panel").evaluate((node) => node.open);
-      expect(systemPanelOpen).toBe(false);
-
       const transcriptBox = await page.locator("#transcript").boundingBox();
       expect(transcriptBox).not.toBeNull();
       expect(transcriptBox.height).toBeGreaterThanOrEqual(170);
@@ -210,16 +207,26 @@ for (const viewport of viewports) {
         () => !document.querySelector("#ourbox-chat-root")?.classList.contains("drawer-open")
       );
 
+      await page.locator("#open-thread-menu-button").click();
+      await page.waitForFunction(() =>
+        document.querySelector("#ourbox-chat-root")?.classList.contains("menu-open")
+      );
       await page.locator("#rename-thread-button").click();
       await page.locator("#rename-input").fill("Groceries");
       await page.locator('#rename-form button[type="submit"]').click();
       await expect(page.locator("#thread-title")).toHaveText("Groceries");
 
-      await page.locator("#system-panel summary").click();
-      await page.waitForFunction(() => document.querySelector("#system-panel").open);
+      await page.locator("#open-system-button").click();
+      await page.waitForFunction(() =>
+        document.querySelector("#ourbox-chat-root")?.classList.contains("system-open")
+      );
       await page
         .locator("#system-prompt-input")
         .fill("Reply with exactly READY and nothing else.");
+      await page.locator("#close-system-sheet-button").click();
+      await page.waitForFunction(
+        () => !document.querySelector("#ourbox-chat-root")?.classList.contains("system-open")
+      );
 
       await page.locator("#composer-input").fill("Reply with exactly READY.");
       await page.locator("#send-button").click();
@@ -235,6 +242,10 @@ for (const viewport of viewports) {
       );
 
       const beforeFork = Number(await page.locator("#thread-count").textContent());
+      await page.locator("#open-thread-menu-button").click();
+      await page.waitForFunction(() =>
+        document.querySelector("#ourbox-chat-root")?.classList.contains("menu-open")
+      );
       await page.locator("#fork-thread-button").click();
       await page.waitForFunction(
         (expected) => Number(document.querySelector("#thread-count")?.textContent) === expected,
@@ -287,29 +298,23 @@ test("desktop short viewport scrolls the workspace outside the transcript", asyn
       { timeout: 120000 }
     );
 
-    const before = await page.locator(".workspace").evaluate((node) => ({
-      top: node.scrollTop,
-      height: node.scrollHeight,
-      client: node.clientHeight,
-    }));
-    const transcriptBefore = await page.locator("#transcript").evaluate((node) => ({
-      client: node.clientHeight,
-      height: node.scrollHeight,
-    }));
+    const shellBox = await page.locator(".phone-shell").boundingBox();
+    expect(shellBox).not.toBeNull();
+    expect(shellBox.width).toBeLessThanOrEqual(480);
 
-    await page.locator(".workspace-topbar").hover();
-    await page.mouse.wheel(0, 700);
-    await page.waitForTimeout(300);
+    const transcriptBefore = await page.locator("#transcript").boundingBox();
+    expect(transcriptBefore).not.toBeNull();
+    expect(transcriptBefore.height).toBeGreaterThanOrEqual(220);
 
-    const after = await page.locator(".workspace").evaluate((node) => ({
-      top: node.scrollTop,
-      height: node.scrollHeight,
-      client: node.clientHeight,
-    }));
-
-    expect(before.height).toBeGreaterThan(before.client);
-    expect(transcriptBefore.client).toBeGreaterThanOrEqual(210);
-    expect(after.top).toBeGreaterThan(before.top);
+    await page.locator("#open-thread-menu-button").click();
+    await page.waitForFunction(() =>
+      document.querySelector("#ourbox-chat-root")?.classList.contains("menu-open")
+    );
+    await expect(page.locator("#thread-menu-sheet")).toBeVisible();
+    await page.locator("#close-thread-menu-button").click();
+    await page.waitForFunction(
+      () => !document.querySelector("#ourbox-chat-root")?.classList.contains("menu-open")
+    );
 
     await context.close();
   } finally {

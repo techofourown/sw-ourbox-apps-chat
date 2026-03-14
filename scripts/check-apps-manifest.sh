@@ -45,8 +45,8 @@ for required_file in (
     "ui/shell/contract.js",
     "ui/shell/app-model.js",
     "ui/shell/bootstrap.js",
-    "ui/views/default/view.js",
-    "ui/views/default/view.css",
+    "ui/views/mobile-native/view.js",
+    "ui/views/mobile-native/view.css",
 ):
     if not (app_dir / required_file).is_file():
         raise SystemExit(f"missing required file: {app_dir / required_file}")

@@ -2,7 +2,7 @@
 
 This document is the normative public contract for browser-based `ourbox-chat`
 views. It defines the supported shell, app-model, and view-module boundaries.
-It does not define or freeze the default DOM tree, CSS class names, layout, or
+It does not define or freeze the shipped DOM tree, CSS class names, layout, or
 implementation details.
 
 ## 1. Scope and non-goals
@@ -13,8 +13,8 @@ implementation details.
 
 The following are not public API and must not be treated as public API:
 
-- default view DOM structure
-- default view CSS class names or IDs
+- shipped view DOM structure
+- shipped view CSS class names or IDs
 - localStorage keys or storage schema details
 - runtime endpoint paths
 - default system prompt text
@@ -38,8 +38,8 @@ state, dialogs, focus, or DOM structure, it belongs to the view.
    Owns DOM, layout, dialogs, drawers, keyboard behavior, responsive behavior,
    and all other view-local state.
 
-Alternative views target the app-model contract. They do not import or depend
-on the default view.
+Views target the app-model contract. They do not import or depend on another
+view implementation.
 
 ## 3. Public globals
 
@@ -315,7 +315,7 @@ apps/ourbox-chat/ui/
     app-model.js
     bootstrap.js
   views/
-    default/
+    mobile-native/
       view.js
       view.css
 ```
@@ -341,7 +341,7 @@ An alternate view is compliant if all of the following are true:
 - it renders entirely from public state snapshots
 - it dispatches only public commands
 - it cleans up subscriptions and DOM listeners in `unmount()`
-- it does not read or depend on the default view implementation
+- it does not read or depend on another shipped view implementation
 
 ## 9. Minimal starter example
 
@@ -392,9 +392,9 @@ An alternate view is compliant if all of the following are true:
 })();
 ```
 
-## 10. Default view note
+## 10. Shipped view note
 
-The shipped default web UI is one compliant view implementation. Its DOM
-structure, CSS selectors, and private layout behavior exist for that view only.
-They are intentionally not part of this contract and may change without a
+The shipped `mobile-native` web UI is one compliant view implementation. Its
+DOM structure, CSS selectors, and private layout behavior exist for that view
+only. They are intentionally not part of this contract and may change without a
 contract version bump.

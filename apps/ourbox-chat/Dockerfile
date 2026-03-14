@@ -4,7 +4,7 @@ LABEL org.opencontainers.image.title="OurBox Chat" \
       org.opencontainers.image.description="CPU-only local chat app for OurBox with a bundled small GGUF model." \
       org.opencontainers.image.source="https://github.com/techofourown/sw-ourbox-apps-chat"
 
-ARG OURBOX_CHAT_VIEW=default
+ARG OURBOX_CHAT_VIEW=mobile-native
 
 USER root
 

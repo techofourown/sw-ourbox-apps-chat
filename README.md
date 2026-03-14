@@ -11,8 +11,8 @@ The initial app in this repo is `ourbox-chat`:
 - exposes a custom mobile-first OurBox web UI over HTTP
 - keeps multiple saved conversation threads in browser storage
 - supports per-thread system prompts, rename, delete, and fork workflows
-- separates the shipped shell, app model, and default view so alternate web
-  views can target a stable contract
+- separates the shipped shell, app model, and bundled mobile-native view so the
+  browser contract stays clean
 - intended to be consumed by `sw-ourbox-catalog-*` repositories
 
 ## Published application
@@ -43,17 +43,17 @@ app path for a local chat experience on OurBox.
 - `ui/shell`
   - minimal HTML shell plus the public `window.OurBoxChatContract` and
     `window.OurBoxChat` app-model API
-- `ui/views/default`
-  - the default mountable view bundle (`window.OurBoxChatView`)
+- `ui/views/mobile-native`
+  - the shipped phone-first mountable view bundle (`window.OurBoxChatView`)
 - `docs/reference/view-layer-contract.md`
-  - the normative contract for alternate web views
+  - the normative contract for browser views targeting the app model
 
 The shell owns bootstrapping only. The app model owns threads, persistence,
-runtime probing, request dispatch, and events. The selected view owns DOM,
-layout, drawer state, dialogs, focus, and styling.
+runtime probing, request dispatch, and events. The shipped mobile-native view
+owns DOM, layout, sheet state, dialogs, focus, and styling.
 
-The Docker build selects one view at build time with `OURBOX_CHAT_VIEW`
-and publishes a flat runtime asset set:
+The Docker build still uses `OURBOX_CHAT_VIEW`, but the repo now ships
+`mobile-native` as the bundled view and publishes a flat runtime asset set:
 
 - `/contract.js`
 - `/app-model.js`
@@ -68,7 +68,7 @@ and publishes a flat runtime asset set:
 - [apps/ourbox-chat](/techofourown/sw-ourbox-apps-chat/apps/ourbox-chat)
   - image build inputs for the local chat application
 - [docs/reference/view-layer-contract.md](/techofourown/sw-ourbox-apps-chat/docs/reference/view-layer-contract.md)
-  - normative shell/app-model/view contract for alternate web UIs
+  - normative shell/app-model/view contract for browser UIs
 - [.github/workflows/ci.yml](/techofourown/sw-ourbox-apps-chat/.github/workflows/ci.yml)
   - lightweight validation
 - [.github/workflows/publish-images.yml](/techofourown/sw-ourbox-apps-chat/.github/workflows/publish-images.yml)
