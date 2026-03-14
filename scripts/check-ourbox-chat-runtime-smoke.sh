@@ -2,8 +2,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-IMAGE_TAG="local/sw-ourbox-apps-chat-woodbox-chat:ci"
-CONTAINER_NAME="woodbox-chat-runtime-smoke"
+IMAGE_TAG="local/sw-ourbox-apps-chat-ourbox-chat:ci"
+CONTAINER_NAME="ourbox-chat-runtime-smoke"
 PORT="18080"
 
 need_cmd() {
@@ -30,55 +30,55 @@ docker run -d --rm \
   "${IMAGE_TAG}" >/dev/null
 
 for _ in $(seq 1 60); do
-  if curl -fsS "http://127.0.0.1:${PORT}/health" >"${ROOT}/dist/woodbox-chat-runtime-health.json" 2>/dev/null; then
+  if curl -fsS "http://127.0.0.1:${PORT}/health" >"${ROOT}/dist/ourbox-chat-runtime-health.json" 2>/dev/null; then
     break
   fi
   sleep 2
 done
 
-test -f "${ROOT}/dist/woodbox-chat-runtime-health.json" || {
-  echo "woodbox-chat runtime did not become ready" >&2
+test -f "${ROOT}/dist/ourbox-chat-runtime-health.json" || {
+  echo "ourbox-chat runtime did not become ready" >&2
   docker logs "${CONTAINER_NAME}" >&2 || true
   exit 1
 }
 
-grep -q '"status":"ok"' "${ROOT}/dist/woodbox-chat-runtime-health.json" || {
-  echo "woodbox-chat health endpoint did not report ok" >&2
+grep -q '"status":"ok"' "${ROOT}/dist/ourbox-chat-runtime-health.json" || {
+  echo "ourbox-chat health endpoint did not report ok" >&2
   docker logs "${CONTAINER_NAME}" >&2 || true
   exit 1
 }
 
-curl -fsSI "http://127.0.0.1:${PORT}/health" >"${ROOT}/dist/woodbox-chat-runtime-health.headers"
+curl -fsSI "http://127.0.0.1:${PORT}/health" >"${ROOT}/dist/ourbox-chat-runtime-health.headers"
 
-grep -qi '^Server: llama\.cpp' "${ROOT}/dist/woodbox-chat-runtime-health.headers" || {
-  echo "woodbox-chat health endpoint did not advertise the llama.cpp server header" >&2
+grep -qi '^Server: llama\.cpp' "${ROOT}/dist/ourbox-chat-runtime-health.headers" || {
+  echo "ourbox-chat health endpoint did not advertise the llama.cpp server header" >&2
   docker logs "${CONTAINER_NAME}" >&2 || true
   exit 1
 }
 
-curl -fsS "http://127.0.0.1:${PORT}/v1/models" >"${ROOT}/dist/woodbox-chat-runtime-models.json"
+curl -fsS "http://127.0.0.1:${PORT}/v1/models" >"${ROOT}/dist/ourbox-chat-runtime-models.json"
 
-grep -q '"object":"list"' "${ROOT}/dist/woodbox-chat-runtime-models.json" || {
-  echo "woodbox-chat models endpoint did not return the expected model listing" >&2
+grep -q '"object":"list"' "${ROOT}/dist/ourbox-chat-runtime-models.json" || {
+  echo "ourbox-chat models endpoint did not return the expected model listing" >&2
   docker logs "${CONTAINER_NAME}" >&2 || true
   exit 1
 }
 
-curl --compressed -fsS "http://127.0.0.1:${PORT}/" >"${ROOT}/dist/woodbox-chat-runtime-ui.html"
+curl --compressed -fsS "http://127.0.0.1:${PORT}/" >"${ROOT}/dist/ourbox-chat-runtime-ui.html"
 
-grep -q 'data-app="woodbox-chat"' "${ROOT}/dist/woodbox-chat-runtime-ui.html" || {
-  echo "woodbox-chat root page did not serve the custom app shell" >&2
+grep -q 'data-app="ourbox-chat"' "${ROOT}/dist/ourbox-chat-runtime-ui.html" || {
+  echo "ourbox-chat root page did not serve the custom app shell" >&2
   docker logs "${CONTAINER_NAME}" >&2 || true
   exit 1
 }
 
-grep -q "New Thread" "${ROOT}/dist/woodbox-chat-runtime-ui.html" || {
-  echo "woodbox-chat root page did not include the thread UI controls" >&2
+grep -q "OurBox Chat" "${ROOT}/dist/ourbox-chat-runtime-ui.html" || {
+  echo "ourbox-chat root page did not include the thread UI controls" >&2
   docker logs "${CONTAINER_NAME}" >&2 || true
   exit 1
 }
 
-python3 - <<'PY' "http://127.0.0.1:${PORT}/v1/chat/completions" >"${ROOT}/dist/woodbox-chat-runtime-generation.json"
+python3 - <<'PY' "http://127.0.0.1:${PORT}/v1/chat/completions" >"${ROOT}/dist/ourbox-chat-runtime-generation.json"
 import json
 import sys
 import urllib.request
@@ -115,4 +115,4 @@ if not content.lower().startswith("ready"):
 print(body)
 PY
 
-printf '[%s] woodbox-chat runtime smoke passed\n' "$(date -Is)"
+printf '[%s] ourbox-chat runtime smoke passed\n' "$(date -Is)"

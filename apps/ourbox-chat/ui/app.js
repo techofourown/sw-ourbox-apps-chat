@@ -1,18 +1,25 @@
 (function () {
-  const STORAGE_KEY = "woodbox-chat-state-v1";
+  const STORAGE_KEY = "ourbox-chat-state-v1";
+  const MOBILE_BREAKPOINT = 980;
   const DEFAULT_SYSTEM_PROMPT =
-    "You are Woodbox Chat, a local assistant running fully on this device. " +
+    "You are OurBox Chat, a local assistant running fully on this device. " +
     "Be direct, practical, and concise. Admit uncertainty when needed.";
   const PENDING_MESSAGE_ID = "pending-assistant-message";
 
   const elements = {
+    drawerBackdrop: document.getElementById("drawer-backdrop"),
+    openDrawerButton: document.getElementById("open-drawer-button"),
+    closeDrawerButton: document.getElementById("close-drawer-button"),
     threadList: document.getElementById("thread-list"),
     threadCount: document.getElementById("thread-count"),
     threadTitle: document.getElementById("thread-title"),
     threadMeta: document.getElementById("thread-meta"),
+    runtimeSummary: document.getElementById("runtime-summary"),
+    modelSummary: document.getElementById("model-summary"),
     transcript: document.getElementById("transcript"),
     composerForm: document.getElementById("composer-form"),
     composerInput: document.getElementById("composer-input"),
+    systemPanel: document.getElementById("system-panel"),
     systemPromptInput: document.getElementById("system-prompt-input"),
     newThreadButton: document.getElementById("new-thread-button"),
     renameThreadButton: document.getElementById("rename-thread-button"),
@@ -40,17 +47,31 @@
     modelName: "Loading",
     runtimeReady: false,
     runtimeMessage: "Connecting to the bundled local model server.",
+    drawerOpen: false,
   };
 
   function nowIso() {
     return new Date().toISOString();
   }
 
+  function isDesktopLayout() {
+    return window.matchMedia("(min-width: " + MOBILE_BREAKPOINT + "px)").matches;
+  }
+
   function makeId(prefix) {
     if (window.crypto && typeof window.crypto.randomUUID === "function") {
-      return `${prefix}-${window.crypto.randomUUID()}`;
+      return prefix + "-" + window.crypto.randomUUID();
     }
-    return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    return prefix + "-" + Date.now() + "-" + Math.random().toString(16).slice(2);
+  }
+
+  function formatThreadTitle(date) {
+    return new Intl.DateTimeFormat(undefined, {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(date);
   }
 
   function createThread(seed) {
@@ -58,17 +79,12 @@
     const title =
       seed && seed.title
         ? seed.title
-        : `Thread ${new Intl.DateTimeFormat(undefined, {
-            month: "short",
-            day: "numeric",
-            hour: "numeric",
-            minute: "2-digit",
-          }).format(new Date())}`;
+        : "Chat " + formatThreadTitle(new Date());
 
     return {
       id: makeId("thread"),
-      title,
-      createdAt,
+      title: title,
+      createdAt: createdAt,
       updatedAt: createdAt,
       systemPrompt:
         seed && typeof seed.systemPrompt === "string"
@@ -109,36 +125,42 @@
         return defaultState();
       }
 
+      const threads = parsed.threads
+        .filter(function (thread) {
+          return thread && Array.isArray(thread.messages);
+        })
+        .map(function (thread) {
+          return {
+            id: thread.id || makeId("thread"),
+            title: thread.title || "Untitled Chat",
+            createdAt: thread.createdAt || nowIso(),
+            updatedAt: thread.updatedAt || nowIso(),
+            systemPrompt:
+              typeof thread.systemPrompt === "string" && thread.systemPrompt.trim()
+                ? thread.systemPrompt
+                : DEFAULT_SYSTEM_PROMPT,
+            draft: typeof thread.draft === "string" ? thread.draft : "",
+            messages: thread.messages.map(function (message) {
+              return {
+                id: message.id || makeId("message"),
+                role: message.role === "assistant" ? "assistant" : "user",
+                content: typeof message.content === "string" ? message.content : "",
+                createdAt: message.createdAt || nowIso(),
+              };
+            }),
+          };
+        });
+
+      if (!threads.length) {
+        return defaultState();
+      }
+
       return {
-        threads: parsed.threads
-          .filter(function (thread) {
-            return thread && Array.isArray(thread.messages);
-          })
-          .map(function (thread) {
-            return {
-              id: thread.id || makeId("thread"),
-              title: thread.title || "Untitled Thread",
-              createdAt: thread.createdAt || nowIso(),
-              updatedAt: thread.updatedAt || nowIso(),
-              systemPrompt:
-                typeof thread.systemPrompt === "string" && thread.systemPrompt.trim()
-                  ? thread.systemPrompt
-                  : DEFAULT_SYSTEM_PROMPT,
-              draft: typeof thread.draft === "string" ? thread.draft : "",
-              messages: thread.messages.map(function (message) {
-                return {
-                  id: message.id || makeId("message"),
-                  role: message.role === "assistant" ? "assistant" : "user",
-                  content: typeof message.content === "string" ? message.content : "",
-                  createdAt: message.createdAt || nowIso(),
-                };
-              }),
-            };
-          }),
-        activeThreadId: parsed.activeThreadId || parsed.threads[0].id,
+        threads: threads,
+        activeThreadId: parsed.activeThreadId || threads[0].id,
       };
     } catch (error) {
-      console.error("failed to load saved Woodbox Chat state", error);
+      console.error("failed to load saved OurBox Chat state", error);
       return defaultState();
     }
   }
@@ -170,6 +192,26 @@
     thread.updatedAt = nowIso();
   }
 
+  function setDrawerOpen(shouldOpen) {
+    state.drawerOpen = !isDesktopLayout() && shouldOpen;
+    syncLayout();
+  }
+
+  function closeDrawerIfMobile() {
+    if (!isDesktopLayout()) {
+      setDrawerOpen(false);
+    }
+  }
+
+  function syncLayout() {
+    const desktop = isDesktopLayout();
+    const drawerOpen = !desktop && state.drawerOpen;
+
+    document.body.classList.toggle("drawer-open", drawerOpen);
+    elements.drawerBackdrop.classList.toggle("hidden", !drawerOpen);
+    elements.openDrawerButton.setAttribute("aria-expanded", drawerOpen ? "true" : "false");
+  }
+
   function setComposerBusy(isBusy) {
     elements.sendButton.disabled = isBusy;
     elements.cancelRequestButton.disabled = !isBusy;
@@ -182,14 +224,21 @@
   }
 
   function updateRuntimeStatus(kind, message) {
-    state.runtimeReady = kind === "ready";
+    const ready = kind === "ready";
+    const offline = kind === "error";
+
+    state.runtimeReady = ready;
     state.runtimeMessage = message;
-    elements.runtimeStatus.textContent =
-      kind === "ready" ? "Ready" : kind === "error" ? "Offline" : "Checking";
+
+    elements.runtimeStatus.textContent = ready ? "Ready" : offline ? "Offline" : "Checking";
     elements.runtimeStatus.className =
-      "status-pill " +
-      (kind === "ready" ? "status-ready" : kind === "error" ? "status-error" : "");
+      "status-pill " + (ready ? "status-ready" : offline ? "status-error" : "");
     elements.statusCopy.textContent = message;
+    elements.runtimeSummary.textContent = ready
+      ? "Ready for local replies"
+      : offline
+        ? "Runtime unavailable"
+        : "Checking local runtime";
   }
 
   function describeThread(thread) {
@@ -240,6 +289,7 @@
       button.addEventListener("click", function () {
         state.activeThreadId = thread.id;
         render();
+        closeDrawerIfMobile();
       });
 
       elements.threadList.appendChild(fragment);
@@ -265,7 +315,7 @@
       const emptyState = document.createElement("div");
       emptyState.className = "empty-state";
       emptyState.innerHTML =
-        "<div><strong>This thread is empty.</strong><br>Ask a question to begin a local conversation.</div>";
+        "<div><strong>This chat is empty.</strong><br>Ask a question to begin a local conversation.</div>";
       elements.transcript.appendChild(emptyState);
       return;
     }
@@ -278,7 +328,7 @@
       const body = fragment.querySelector(".message-body");
 
       card.classList.add("role-" + (message.pending ? "pending" : message.role));
-      role.textContent = message.role === "assistant" ? "Assistant" : "You";
+      role.textContent = message.role === "assistant" ? "OurBox Chat" : "You";
       time.textContent = new Intl.DateTimeFormat(undefined, {
         hour: "numeric",
         minute: "2-digit",
@@ -296,10 +346,13 @@
     const threadInfo = describeThread(thread);
 
     elements.threadTitle.textContent = thread.title;
-    elements.threadMeta.textContent = threadInfo.meta;
+    elements.threadMeta.textContent = thread.messages.length
+      ? threadInfo.meta
+      : "Saved locally in this browser. The model runs entirely on this box.";
     elements.systemPromptInput.value = thread.systemPrompt;
     elements.composerInput.value = thread.draft;
     elements.modelName.textContent = state.modelName;
+    elements.modelSummary.textContent = state.modelName;
 
     renderMessages(thread);
   }
@@ -308,12 +361,13 @@
     renderThreads();
     renderWorkspace();
     setComposerBusy(state.requestController !== null);
+    syncLayout();
   }
 
   function renameActiveThread(nextTitle) {
     const thread = getActiveThread();
     const cleaned = nextTitle.trim();
-    thread.title = cleaned || "Untitled Thread";
+    thread.title = cleaned || "Untitled Chat";
     touchThread(thread);
     persistState();
     render();
@@ -331,6 +385,7 @@
     state.activeThreadId = forked.id;
     persistState();
     render();
+    closeDrawerIfMobile();
   }
 
   function deleteActiveThread() {
@@ -369,7 +424,7 @@
       return;
     }
 
-    if (!thread.title.startsWith("Thread ")) {
+    if (!thread.title.startsWith("Chat ")) {
       return;
     }
 
@@ -512,12 +567,29 @@
   }
 
   function attachEvents() {
+    elements.openDrawerButton.addEventListener("click", function () {
+      setDrawerOpen(true);
+    });
+
+    elements.closeDrawerButton.addEventListener("click", function () {
+      setDrawerOpen(false);
+    });
+
+    elements.drawerBackdrop.addEventListener("click", function () {
+      setDrawerOpen(false);
+    });
+
+    window.addEventListener("resize", function () {
+      syncLayout();
+    });
+
     elements.newThreadButton.addEventListener("click", function () {
       const thread = createThread();
       state.threads.unshift(thread);
       state.activeThreadId = thread.id;
       persistState();
       render();
+      closeDrawerIfMobile();
       elements.composerInput.focus();
     });
 
@@ -529,7 +601,7 @@
         elements.renameInput.focus();
         elements.renameInput.select();
       } else {
-        const nextTitle = window.prompt("Rename thread", thread.title);
+        const nextTitle = window.prompt("Rename chat", thread.title);
         if (nextTitle !== null) {
           renameActiveThread(nextTitle);
         }
@@ -552,7 +624,7 @@
 
     elements.deleteThreadButton.addEventListener("click", function () {
       const confirmed = window.confirm(
-        "Delete this thread? The saved messages in this browser will be removed."
+        "Delete this chat? The saved messages in this browser will be removed."
       );
       if (confirmed) {
         deleteActiveThread();
@@ -600,6 +672,8 @@
       state.threads = defaultState().threads;
       state.activeThreadId = state.threads[0].id;
     }
+
+    elements.systemPanel.open = isDesktopLayout();
 
     attachEvents();
     render();

@@ -37,6 +37,6 @@ for app in manifest["apps"]:
     )
 PY
 
-bash "${ROOT}/scripts/check-woodbox-chat-runtime-smoke.sh"
+bash "${ROOT}/scripts/check-ourbox-chat-runtime-smoke.sh"
 
 printf '[%s] app build smoke passed\n' "$(date -Is)"

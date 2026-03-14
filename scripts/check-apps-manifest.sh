@@ -30,7 +30,7 @@ source_path = str(app.get("source_path", "")).strip()
 default_tag = str(app.get("default_tag", "")).strip()
 if not app_id or not image_repo or not source_path or not default_tag:
     raise SystemExit("chat app must declare non-empty app_id, image_repo, source_path, and default_tag")
-if image_repo != "ghcr.io/techofourown/sw-ourbox-apps-chat/woodbox-chat":
+if image_repo != "ghcr.io/techofourown/sw-ourbox-apps-chat/ourbox-chat":
     raise SystemExit(f"unexpected image_repo: {image_repo}")
 
 app_dir = root / source_path
