@@ -39,6 +39,21 @@ if not app_dir.is_dir():
 for required_file in ("Dockerfile", "entrypoint.sh", "MODEL.md"):
     if not (app_dir / required_file).is_file():
         raise SystemExit(f"missing required file: {app_dir / required_file}")
+
+for required_file in (
+    "ui/shell/index.html",
+    "ui/shell/contract.js",
+    "ui/shell/app-model.js",
+    "ui/shell/bootstrap.js",
+    "ui/views/default/view.js",
+    "ui/views/default/view.css",
+):
+    if not (app_dir / required_file).is_file():
+        raise SystemExit(f"missing required file: {app_dir / required_file}")
+
+contract_doc = root / "docs/reference/view-layer-contract.md"
+if not contract_doc.is_file():
+    raise SystemExit(f"missing required file: {contract_doc}")
 PY
 
 printf '[%s] apps manifest validation passed\n' "$(date -Is)"

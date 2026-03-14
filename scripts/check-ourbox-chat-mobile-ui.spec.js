@@ -35,6 +35,116 @@ const viewports = [
   { name: "phone-428x926", width: 428, height: 926 },
 ];
 
+test("browser contract surface is mounted and request.send resolves after acceptance", async () => {
+  test.skip(!url, "OURBOX_CHAT_UI_URL is required");
+
+  fs.mkdirSync(artifactsDir, { recursive: true });
+
+  const browser = await chromium.launch(chromiumLaunchOptions());
+
+  try {
+    const context = await browser.newContext({
+      viewport: {
+        width: 1280,
+        height: 900,
+      },
+    });
+    const page = await context.newPage();
+
+    await page.goto(url, {
+      waitUntil: "networkidle",
+      timeout: 120000,
+    });
+    await page.evaluate(() => localStorage.clear());
+    await page.reload({
+      waitUntil: "networkidle",
+      timeout: 120000,
+    });
+
+    await page.waitForFunction(
+      () =>
+        !!window.OurBoxChat &&
+        !!window.OurBoxChatContract &&
+        !!window.OurBoxChatView &&
+        window.OurBoxChatContract.id === "ourbox-chat.view-layer",
+      null,
+      { timeout: 120000 }
+    );
+    await page.waitForFunction(
+      () => document.querySelector("#runtime-status")?.textContent.trim() === "Ready",
+      null,
+      { timeout: 120000 }
+    );
+
+    const surface = await page.evaluate(async () => {
+      const contract = window.OurBoxChatContract;
+      const app = window.OurBoxChat;
+      const before = app.getState();
+      const createResult = await app.dispatch({
+        type: contract.commands.THREAD_CREATE,
+      });
+      const created = app.getState();
+      const dispatchStartedAt = Date.now();
+      const sendResult = await app.dispatch({
+        type: contract.commands.REQUEST_SEND,
+        threadId: created.activeThreadId,
+        content: "Reply with exactly READY.",
+      });
+      const afterSend = app.getState();
+
+      return {
+        contractId: contract.id,
+        contractVersion: contract.version,
+        viewId: window.OurBoxChatView.id,
+        createOk: createResult.ok,
+        threadCountBefore: before.threads.length,
+        threadCountAfter: created.threads.length,
+        sendOk: sendResult.ok,
+        elapsedMs: Date.now() - dispatchStartedAt,
+        inFlightAfterSend: afterSend.request.inFlight,
+        requestThreadId: afterSend.request.threadId,
+        activeThreadId: created.activeThreadId,
+      };
+    });
+
+    expect(surface.contractId).toBe("ourbox-chat.view-layer");
+    expect(surface.contractVersion).toBe("1.0.0");
+    expect(surface.viewId).toBe("default");
+    expect(surface.createOk).toBe(true);
+    expect(surface.threadCountAfter).toBe(surface.threadCountBefore + 1);
+    expect(surface.sendOk).toBe(true);
+    expect(surface.elapsedMs).toBeLessThan(2000);
+    expect(surface.inFlightAfterSend).toBe(true);
+    expect(surface.requestThreadId).toBe(surface.activeThreadId);
+
+    await page.waitForFunction(
+      () => !window.OurBoxChat.getState().request.inFlight,
+      null,
+      { timeout: 120000 }
+    );
+
+    const completion = await page.evaluate(() => {
+      const state = window.OurBoxChat.getState();
+      const thread = state.activeThread;
+      const lastMessage = thread.messages[thread.messages.length - 1];
+
+      return {
+        runtimeStatus: state.runtime.status,
+        lastRole: lastMessage.role,
+        lastContent: lastMessage.content,
+      };
+    });
+
+    expect(completion.runtimeStatus).toBe("ready");
+    expect(completion.lastRole).toBe("assistant");
+    expect(completion.lastContent).toMatch(/ready/i);
+
+    await context.close();
+  } finally {
+    await browser.close();
+  }
+});
+
 for (const viewport of viewports) {
   test("mobile UI smoke: " + viewport.name, async () => {
     test.skip(!url, "OURBOX_CHAT_UI_URL is required");
@@ -62,6 +172,12 @@ for (const viewport of viewports) {
         timeout: 120000,
       });
 
+      await page.waitForFunction(
+        () => !!window.OurBoxChat && !!window.OurBoxChatContract && !!window.OurBoxChatView,
+        null,
+        { timeout: 120000 }
+      );
+
       await expect(page.locator("h1")).toHaveText("OurBox Chat");
       await expect(page.locator("#open-drawer-button")).toBeVisible();
       await expect(page.locator("#thread-title")).toContainText("Chat");
@@ -79,7 +195,9 @@ for (const viewport of viewports) {
       expect(transcriptBox.height).toBeGreaterThanOrEqual(170);
 
       await page.locator("#open-drawer-button").click();
-      await page.waitForFunction(() => document.body.classList.contains("drawer-open"));
+      await page.waitForFunction(() =>
+        document.querySelector("#ourbox-chat-root")?.classList.contains("drawer-open")
+      );
 
       const beforeNew = Number(await page.locator("#thread-count").textContent());
       await page.locator("#new-thread-button").click();
@@ -88,7 +206,9 @@ for (const viewport of viewports) {
         beforeNew + 1,
         { timeout: 10000 }
       );
-      await page.waitForFunction(() => !document.body.classList.contains("drawer-open"));
+      await page.waitForFunction(
+        () => !document.querySelector("#ourbox-chat-root")?.classList.contains("drawer-open")
+      );
 
       await page.locator("#rename-thread-button").click();
       await page.locator("#rename-input").fill("Groceries");

@@ -72,8 +72,38 @@ grep -q 'data-app="ourbox-chat"' "${ROOT}/dist/ourbox-chat-runtime-ui.html" || {
   exit 1
 }
 
+grep -q 'id="ourbox-chat-root"' "${ROOT}/dist/ourbox-chat-runtime-ui.html" || {
+  echo "ourbox-chat root page did not expose the shell mount root" >&2
+  docker logs "${CONTAINER_NAME}" >&2 || true
+  exit 1
+}
+
+grep -q 'src="/contract.js"' "${ROOT}/dist/ourbox-chat-runtime-ui.html" || {
+  echo "ourbox-chat root page did not load contract.js" >&2
+  docker logs "${CONTAINER_NAME}" >&2 || true
+  exit 1
+}
+
+grep -q 'src="/app-model.js"' "${ROOT}/dist/ourbox-chat-runtime-ui.html" || {
+  echo "ourbox-chat root page did not load app-model.js" >&2
+  docker logs "${CONTAINER_NAME}" >&2 || true
+  exit 1
+}
+
+grep -q 'src="/view.js"' "${ROOT}/dist/ourbox-chat-runtime-ui.html" || {
+  echo "ourbox-chat root page did not load view.js" >&2
+  docker logs "${CONTAINER_NAME}" >&2 || true
+  exit 1
+}
+
+grep -q 'src="/bootstrap.js"' "${ROOT}/dist/ourbox-chat-runtime-ui.html" || {
+  echo "ourbox-chat root page did not load bootstrap.js" >&2
+  docker logs "${CONTAINER_NAME}" >&2 || true
+  exit 1
+}
+
 grep -q "OurBox Chat" "${ROOT}/dist/ourbox-chat-runtime-ui.html" || {
-  echo "ourbox-chat root page did not include the thread UI controls" >&2
+  echo "ourbox-chat root page did not include expected shell metadata" >&2
   docker logs "${CONTAINER_NAME}" >&2 || true
   exit 1
 }
