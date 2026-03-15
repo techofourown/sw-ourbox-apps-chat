@@ -65,11 +65,11 @@ jobs:
   refresh-catalogs:
     needs: publish
     runs-on: ubuntu-latest
+    env:
+      CATALOG_REFRESH_TOKEN: ${{ secrets.CATALOG_REFRESH_TOKEN }}
     steps:
       - name: Trigger downstream catalog refresh
-        if: ${{ secrets.CATALOG_REFRESH_TOKEN != '' }}
-        env:
-          CATALOG_REFRESH_TOKEN: ${{ secrets.CATALOG_REFRESH_TOKEN }}
+        if: ${{ env.CATALOG_REFRESH_TOKEN != '' }}
         run: |
           set -euo pipefail
           for repo in sw-ourbox-catalog-hello-world; do
