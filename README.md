@@ -1,12 +1,12 @@
 # sw-ourbox-apps-chat
 
-`sw-ourbox-apps-chat` publishes a small local-LLM chat application image for
+`sw-ourbox-apps-chat` publishes a CPU-first local chat application image for
 OurBox.
 
 The initial app in this repo is `ourbox-chat`:
 
 - CPU-only local chat powered by `llama.cpp`
-- bundles a small GGUF model into the image so the target does not download a
+- bundles a capable GGUF model into the image so the target does not download a
   model at install time or first boot
 - exposes a custom mobile-first OurBox web UI over HTTP
 - keeps multiple saved conversation threads in browser storage
@@ -18,7 +18,7 @@ The initial app in this repo is `ourbox-chat`:
 ## Published application
 
 - `ourbox-chat`
-  - local chat UI backed by a bundled Qwen 2.5 0.5B instruct GGUF model
+  - local chat UI backed by a bundled Qwen3 4B GGUF model
   - saved threads, forkable conversations, rename controls, and system prompt editing
   - product name: `OurBox Chat`
   - image: `ghcr.io/techofourown/sw-ourbox-apps-chat/ourbox-chat`
@@ -27,14 +27,15 @@ The initial app in this repo is `ourbox-chat`:
 
 ## Model choice
 
-The first bundled model is:
+The bundled model is:
 
-- source: `Qwen/Qwen2.5-0.5B-Instruct-GGUF`
-- file: `qwen2.5-0.5b-instruct-q4_k_m.gguf`
+- source: `Qwen/Qwen3-4B-GGUF`
+- file: `Qwen3-4B-Q4_K_M.gguf`
 
-This is intentionally a small CPU-first starting point. It is not meant to be
-the final word on local models; it is meant to prove the full offline-staged
-app path for a local chat experience on OurBox.
+This is a more capable CPU-first baseline than the original 0.5B model while
+still staying in a range that is realistic for local `llama.cpp` deployment on
+OurBox. The deployment defaults to direct-answer chat behavior and strips any
+reasoning artifacts before rendering them in the app UI.
 
 ## View-Layer Architecture
 

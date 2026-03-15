@@ -30,7 +30,7 @@ docker run -d --rm \
   -p "127.0.0.1:${PORT}:8080" \
   "${IMAGE_TAG}" >/dev/null
 
-for _ in $(seq 1 60); do
+for _ in $(seq 1 180); do
   if curl -fsS "http://127.0.0.1:${PORT}/health" >"${ROOT}/dist/ourbox-chat-runtime-health.json" 2>/dev/null; then
     break
   fi
@@ -111,8 +111,35 @@ grep -q "OurBox Chat" "${ROOT}/dist/ourbox-chat-runtime-ui.html" || {
 
 python3 - <<'PY' "http://127.0.0.1:${PORT}/v1/chat/completions" >"${ROOT}/dist/ourbox-chat-runtime-generation.json"
 import json
+import re
 import sys
 import urllib.request
+
+def flatten_content(content):
+    if isinstance(content, str):
+        return content
+    if not isinstance(content, list):
+        return ""
+    parts = []
+    for part in content:
+        if isinstance(part, str):
+            parts.append(part)
+        elif isinstance(part, dict):
+            text = part.get("text")
+            if isinstance(text, str):
+                parts.append(text)
+    return "".join(parts)
+
+def strip_leading_think_blocks(text):
+    value = str(text or "")
+    while True:
+        trimmed = value.lstrip()
+        if not trimmed.startswith("<think>"):
+            return trimmed.strip()
+        close_index = trimmed.find("</think>")
+        if close_index == -1:
+            return re.sub(r"^<think>", "", trimmed).strip()
+        value = trimmed[close_index + len("</think>"):]
 
 request = urllib.request.Request(
     sys.argv[1],
@@ -135,11 +162,13 @@ request = urllib.request.Request(
     headers={"Content-Type": "application/json"},
 )
 
-with urllib.request.urlopen(request, timeout=120) as response:
+with urllib.request.urlopen(request, timeout=240) as response:
     body = response.read().decode("utf-8")
 
 payload = json.loads(body)
-content = payload["choices"][0]["message"]["content"].strip()
+message = payload["choices"][0]["message"]
+content = strip_leading_think_blocks(flatten_content(message.get("content")))
+
 if not content.lower().startswith("ready"):
     raise SystemExit(f"unexpected generation output: {content!r}")
 

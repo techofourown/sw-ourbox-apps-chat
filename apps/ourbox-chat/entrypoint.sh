@@ -33,6 +33,9 @@ exec /app/llama-server \
   --host "${OURBOX_CHAT_HOST:-0.0.0.0}" \
   --port "${LISTEN_PORT}" \
   --path /app/ui \
+  --jinja \
+  --reasoning-format "${OURBOX_CHAT_REASONING_FORMAT:-deepseek}" \
+  --reasoning-budget "${OURBOX_CHAT_REASONING_BUDGET:-0}" \
   -c "${OURBOX_CHAT_CTX_SIZE:-2048}" \
   -t "${OURBOX_CHAT_THREADS:-4}" \
   -ngl "${OURBOX_CHAT_N_GPU_LAYERS:-0}" \
