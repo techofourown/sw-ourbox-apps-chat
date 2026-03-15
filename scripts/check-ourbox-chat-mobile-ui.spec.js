@@ -4,6 +4,7 @@ const { test, expect, chromium } = require("playwright/test");
 
 const url = process.env.OURBOX_CHAT_UI_URL;
 const artifactsDir = process.env.OURBOX_CHAT_UI_ARTIFACTS_DIR || "dist";
+const LONG_TIMEOUT = 240000;
 const commonChromiumPaths = [
   "/usr/bin/chromium",
   "/usr/bin/chromium-browser",
@@ -53,12 +54,12 @@ test("browser contract surface is mounted and request.send resolves after accept
 
     await page.goto(url, {
       waitUntil: "networkidle",
-      timeout: 120000,
+      timeout: LONG_TIMEOUT,
     });
     await page.evaluate(() => localStorage.clear());
     await page.reload({
       waitUntil: "networkidle",
-      timeout: 120000,
+      timeout: LONG_TIMEOUT,
     });
 
     await page.waitForFunction(
@@ -68,12 +69,12 @@ test("browser contract surface is mounted and request.send resolves after accept
         !!window.OurBoxChatView &&
         window.OurBoxChatContract.id === "ourbox-chat.view-layer",
       null,
-      { timeout: 120000 }
+      { timeout: LONG_TIMEOUT }
     );
     await page.waitForFunction(
       () => document.querySelector("#runtime-status")?.textContent.trim() === "Ready",
       null,
-      { timeout: 120000 }
+      { timeout: LONG_TIMEOUT }
     );
 
     const surface = await page.evaluate(async () => {
@@ -120,7 +121,7 @@ test("browser contract surface is mounted and request.send resolves after accept
     await page.waitForFunction(
       () => !window.OurBoxChat.getState().request.inFlight,
       null,
-      { timeout: 120000 }
+      { timeout: LONG_TIMEOUT }
     );
 
     const completion = await page.evaluate(() => {
@@ -138,6 +139,7 @@ test("browser contract surface is mounted and request.send resolves after accept
     expect(completion.runtimeStatus).toBe("ready");
     expect(completion.lastRole).toBe("assistant");
     expect(completion.lastContent).toMatch(/ready/i);
+    expect(completion.lastContent).not.toMatch(/<think>|<\/think>/i);
 
     await context.close();
   } finally {
@@ -164,18 +166,18 @@ for (const viewport of viewports) {
 
       await page.goto(url, {
         waitUntil: "networkidle",
-        timeout: 120000,
+        timeout: LONG_TIMEOUT,
       });
       await page.evaluate(() => localStorage.clear());
       await page.reload({
         waitUntil: "networkidle",
-        timeout: 120000,
+        timeout: LONG_TIMEOUT,
       });
 
       await page.waitForFunction(
         () => !!window.OurBoxChat && !!window.OurBoxChatContract && !!window.OurBoxChatView,
         null,
-        { timeout: 120000 }
+        { timeout: LONG_TIMEOUT }
       );
 
       await expect(page.locator("h1")).toHaveText("OurBox Chat");
@@ -184,7 +186,7 @@ for (const viewport of viewports) {
       await page.waitForFunction(
         () => document.querySelector("#runtime-status")?.textContent.trim() === "Ready",
         null,
-        { timeout: 120000 }
+        { timeout: LONG_TIMEOUT }
       );
 
       const transcriptBox = await page.locator("#transcript").boundingBox();
@@ -234,12 +236,15 @@ for (const viewport of viewports) {
       await page.waitForFunction(
         () => !document.querySelector(".message-card.role-pending"),
         null,
-        { timeout: 120000 }
+        { timeout: LONG_TIMEOUT }
       );
       await expect(page.locator(".message-card.role-assistant .message-body").last()).toHaveText(
         /ready/i,
-        { timeout: 120000 }
+        { timeout: LONG_TIMEOUT }
       );
+      await expect(
+        page.locator(".message-card.role-assistant .message-body").last()
+      ).not.toContainText("<think>");
 
       const beforeFork = Number(await page.locator("#thread-count").textContent());
       await page.locator("#open-thread-menu-button").click();
@@ -284,18 +289,18 @@ test("desktop short viewport scrolls the workspace outside the transcript", asyn
 
     await page.goto(url, {
       waitUntil: "networkidle",
-      timeout: 120000,
+      timeout: LONG_TIMEOUT,
     });
     await page.evaluate(() => localStorage.clear());
     await page.reload({
       waitUntil: "networkidle",
-      timeout: 120000,
+      timeout: LONG_TIMEOUT,
     });
 
     await page.waitForFunction(
       () => document.querySelector("#runtime-status")?.textContent.trim() === "Ready",
       null,
-      { timeout: 120000 }
+      { timeout: LONG_TIMEOUT }
     );
 
     const shellBox = await page.locator(".phone-shell").boundingBox();

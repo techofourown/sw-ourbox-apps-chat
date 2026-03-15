@@ -8,6 +8,7 @@
   const STORAGE_SCHEMA = 1;
   const DEFAULT_SYSTEM_PROMPT =
     "You are OurBox Chat, a local assistant running fully on this device. " +
+    "You do not have internet access or external tools in this app. " +
     "Be direct, practical, and concise. Admit uncertainty when needed.";
   const DEFAULT_RUNTIME_MESSAGE = "Connecting to the bundled local model server.";
   const DEFAULT_READY_MESSAGE = "Bundled model server is online and ready.";
@@ -19,6 +20,10 @@
   const COMPLETION_DEFAULTS = Object.freeze({
     max_tokens: 256,
     temperature: 0.7,
+    top_p: 0.8,
+    top_k: 20,
+    min_p: 0,
+    presence_penalty: 1.5,
   });
   const ENDPOINTS = Object.freeze({
     health: "/health",
@@ -376,6 +381,63 @@
       thread.title = compact.length > 40 ? compact.slice(0, 37) + "..." : compact;
     }
 
+    function flattenMessageContent(content) {
+      if (typeof content === "string") {
+        return content;
+      }
+
+      if (!Array.isArray(content)) {
+        return "";
+      }
+
+      return content
+        .map(function (part) {
+          if (typeof part === "string") {
+            return part;
+          }
+
+          if (!part || typeof part !== "object") {
+            return "";
+          }
+
+          if (typeof part.text === "string") {
+            return part.text;
+          }
+
+          return "";
+        })
+        .join("");
+    }
+
+    function stripLeadingThinkBlocks(value) {
+      let text = String(value || "");
+
+      for (;;) {
+        const trimmed = text.trimStart();
+        if (!trimmed.startsWith("<think>")) {
+          return trimmed.trim();
+        }
+
+        const closeIndex = trimmed.indexOf("</think>");
+        if (closeIndex === -1) {
+          return trimmed.replace(/^<think>/, "").trim();
+        }
+
+        text = trimmed.slice(closeIndex + "</think>".length);
+      }
+    }
+
+    function extractAssistantReply(payload) {
+      const choice = payload && Array.isArray(payload.choices) ? payload.choices[0] : null;
+      const message = choice && choice.message ? choice.message : null;
+
+      if (!message) {
+        return "";
+      }
+
+      return stripLeadingThinkBlocks(flattenMessageContent(message.content));
+    }
+
     function buildChatPayload(thread) {
       return {
         messages: [
@@ -393,6 +455,10 @@
         ),
         max_tokens: COMPLETION_DEFAULTS.max_tokens,
         temperature: COMPLETION_DEFAULTS.temperature,
+        top_p: COMPLETION_DEFAULTS.top_p,
+        top_k: COMPLETION_DEFAULTS.top_k,
+        min_p: COMPLETION_DEFAULTS.min_p,
+        presence_penalty: COMPLETION_DEFAULTS.presence_penalty,
       };
     }
 
@@ -528,12 +594,7 @@
         }
 
         const data = await response.json();
-        const choice = data && data.choices && data.choices[0];
-        const content =
-          choice &&
-          choice.message &&
-          typeof choice.message.content === "string" &&
-          choice.message.content.trim();
+        const content = extractAssistantReply(data);
 
         if (!content) {
           throw new Error("generation returned an empty reply");
