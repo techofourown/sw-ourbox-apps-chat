@@ -65,18 +65,27 @@ jobs:
   refresh-catalogs:
     needs: publish
     runs-on: ubuntu-latest
-    env:
-      CATALOG_REFRESH_TOKEN: ${{ secrets.CATALOG_REFRESH_TOKEN }}
     steps:
+      - name: Mint org-bot token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.SEMREL_APP_ID }}
+          private-key: ${{ secrets.SEMREL_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: |
+            sw-ourbox-catalog-hello-world
+
       - name: Trigger downstream catalog refresh
-        if: ${{ env.CATALOG_REFRESH_TOKEN != '' }}
+        env:
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
         run: |
           set -euo pipefail
           for repo in sw-ourbox-catalog-hello-world; do
             curl -fsSL \
               -X POST \
               -H "Accept: application/vnd.github+json" \
-              -H "Authorization: Bearer ${CATALOG_REFRESH_TOKEN}" \
+              -H "Authorization: Bearer ${APP_TOKEN}" \
               "https://api.github.com/repos/techofourown/${repo}/dispatches" \
               -d "{\"event_type\":\"refresh-from-upstream-image-publish\",\"client_payload\":{\"source_repo\":\"${GITHUB_REPOSITORY}\",\"source_sha\":\"${GITHUB_SHA}\"}}"
           done
