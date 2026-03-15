@@ -55,7 +55,7 @@ contract object is:
 ```js
 window.OurBoxChatContract = Object.freeze({
   id: "ourbox-chat.view-layer",
-  version: "1.0.0",
+  version: "1.2.0",
   browserEventName: "ourboxchat:event",
   commands: Object.freeze({
     THREAD_CREATE: "thread.create",
@@ -65,6 +65,10 @@ window.OurBoxChatContract = Object.freeze({
     THREAD_DELETE: "thread.delete",
     THREAD_DRAFT_SET: "thread.draft.set",
     THREAD_SYSTEM_PROMPT_SET: "thread.system-prompt.set",
+    THREAD_GENERATION_SETTINGS_SET: "thread.generation-settings.set",
+    THREAD_LATEST_USER_MESSAGE_EDIT: "thread.latest-user-message.edit",
+    THREAD_LATEST_ASSISTANT_MESSAGE_REGENERATE:
+      "thread.latest-assistant-message.regenerate",
     REQUEST_SEND: "request.send",
     REQUEST_CANCEL: "request.cancel",
     RUNTIME_PROBE: "runtime.probe",
@@ -90,6 +94,18 @@ window.OurBoxChatContract = Object.freeze({
   }),
   limits: Object.freeze({
     maxThreadTitleLength: 80,
+    generationSettings: Object.freeze({
+      maxTokens: Object.freeze({ min: 1, max: 2048, step: 1, default: 256 }),
+      temperature: Object.freeze({ min: 0, max: 2, step: 0.1, default: 0.7 }),
+      topP: Object.freeze({ min: 0, max: 1, step: 0.05, default: 0.8 }),
+      topK: Object.freeze({ min: 1, max: 200, step: 1, default: 20 }),
+      presencePenalty: Object.freeze({
+        min: 0,
+        max: 2,
+        step: 0.1,
+        default: 1.5,
+      }),
+    }),
   }),
 });
 ```
@@ -126,6 +142,7 @@ interface PublicState {
     status: "checking" | "ready" | "error";
     message: string;
     modelName: string;
+    contextWindow: number | null;
   };
   request: {
     inFlight: boolean;
@@ -142,8 +159,17 @@ interface ThreadSnapshot {
   createdAt: string;
   updatedAt: string;
   systemPrompt: string;
+  generationSettings: GenerationSettings;
   draft: string;
   messages: MessageSnapshot[];
+}
+
+interface GenerationSettings {
+  maxTokens: number;
+  temperature: number;
+  topP: number;
+  topK: number;
+  presencePenalty: number;
 }
 
 interface MessageSnapshot {
@@ -174,6 +200,13 @@ type Command =
   | { type: "thread.delete"; threadId: string }
   | { type: "thread.draft.set"; threadId: string; draft: string }
   | { type: "thread.system-prompt.set"; threadId: string; systemPrompt: string }
+  | {
+      type: "thread.generation-settings.set";
+      threadId: string;
+      settings: Partial<GenerationSettings>;
+    }
+  | { type: "thread.latest-user-message.edit"; threadId: string; content: string }
+  | { type: "thread.latest-assistant-message.regenerate"; threadId: string }
   | { type: "request.send"; threadId: string; content?: string }
   | { type: "request.cancel" }
   | { type: "runtime.probe" };
@@ -185,6 +218,15 @@ Command rules:
 - `thread.rename` trims and clamps the public title to the contract limit
 - `thread.system-prompt.set` restores the app-model default prompt when given an
   empty string
+- `thread.generation-settings.set` applies a partial patch, clamps numeric values
+  to the contract limits, and persists the updated settings on the addressed
+  thread
+- `thread.latest-user-message.edit` rewrites the most recent user message in the
+  addressed thread, discards any following assistant reply from that trailing
+  exchange, and starts a fresh generation
+- `thread.latest-assistant-message.regenerate` discards the most recent
+  assistant message in the addressed thread and starts a fresh generation from
+  the remaining transcript
 - `request.send` derives message content from `command.content` when provided,
   otherwise from the thread draft
 - `request.send` rejects empty content with `empty-draft`
@@ -195,10 +237,12 @@ Command rules:
 
 Busy policy in v1:
 
-- reject `thread.create`, `thread.fork`, `thread.delete`, and `request.send`
-  while a request is in flight
-- allow `thread.select`, `thread.rename`, `thread.draft.set`, and
-  `thread.system-prompt.set` during an in-flight request
+- reject `thread.create`, `thread.fork`, `thread.delete`, `request.send`,
+  `thread.latest-user-message.edit`, and
+  `thread.latest-assistant-message.regenerate` while a request is in flight
+- allow `thread.select`, `thread.rename`, `thread.draft.set`,
+  `thread.system-prompt.set`, and `thread.generation-settings.set` during an
+  in-flight request
 
 ### 4.4 Dispatch result
 
@@ -256,7 +300,7 @@ Every drop-in web view must register:
 ```js
 window.OurBoxChatView = {
   id: "my-view",
-  contractVersion: "1.0.0",
+  contractVersion: "1.2.0",
   mount({ root, app, contract }) {
     return {
       unmount() {},
@@ -349,7 +393,7 @@ An alternate view is compliant if all of the following are true:
 (function () {
   window.OurBoxChatView = {
     id: "my-view",
-    contractVersion: "1.0.0",
+    contractVersion: "1.2.0",
     mount({ root, app, contract }) {
       function paint(state) {
         root.innerHTML = "";

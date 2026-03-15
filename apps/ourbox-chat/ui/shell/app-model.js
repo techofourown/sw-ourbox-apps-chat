@@ -5,7 +5,12 @@
   }
 
   const STORAGE_KEY = "ourbox-chat-state-v1";
-  const STORAGE_SCHEMA = 1;
+  const STORAGE_SCHEMA = 2;
+  // Always prepended to the editable per-thread behavior prompt.
+  const HIDDEN_SAFETY_SYSTEM_PROMPT =
+    "Safety requirements: do not engage in sexual roleplay. " +
+    "Do not encourage, support, or help the user carry out violent acts or criminal acts. " +
+    "If asked for that kind of help, refuse briefly and redirect to safer, lawful alternatives.";
   const DEFAULT_SYSTEM_PROMPT =
     "You are OurBox Chat, a local assistant running fully on this device. " +
     "You do not have internet access or external tools in this app. " +
@@ -17,17 +22,20 @@
   const DEFAULT_MODEL_NAME = "Loading";
   const UNAVAILABLE_MODEL_NAME = "Unavailable";
   const FALLBACK_MODEL_NAME = "Bundled local model";
-  const COMPLETION_DEFAULTS = Object.freeze({
-    max_tokens: 256,
-    temperature: 0.7,
-    top_p: 0.8,
-    top_k: 20,
-    min_p: 0,
-    presence_penalty: 1.5,
+  const GENERATION_SETTINGS_DEFAULTS = Object.freeze({
+    maxTokens: contract.limits.generationSettings.maxTokens.default,
+    temperature: contract.limits.generationSettings.temperature.default,
+    topP: contract.limits.generationSettings.topP.default,
+    topK: contract.limits.generationSettings.topK.default,
+    presencePenalty: contract.limits.generationSettings.presencePenalty.default,
+  });
+  const COMPLETION_FIXED_DEFAULTS = Object.freeze({
+    minP: 0,
   });
   const ENDPOINTS = Object.freeze({
     health: "/health",
     models: "/v1/models",
+    slots: "/slots",
     chat: "/v1/chat/completions",
   });
 
@@ -67,6 +75,91 @@
     return cleaned.slice(0, contract.limits.maxThreadTitleLength).trimEnd() || fallback;
   }
 
+  function clampNumericSetting(value, limits, integer) {
+    if (value === "" || value === null || value === undefined) {
+      return limits.default;
+    }
+
+    const numeric = Number(value);
+
+    if (!Number.isFinite(numeric)) {
+      return limits.default;
+    }
+
+    const clamped = Math.min(limits.max, Math.max(limits.min, numeric));
+    return integer ? Math.round(clamped) : clamped;
+  }
+
+  function createGenerationSettings(seed) {
+    const candidate = seed && typeof seed === "object" ? seed : {};
+
+    return {
+      maxTokens: clampNumericSetting(
+        candidate.maxTokens,
+        contract.limits.generationSettings.maxTokens,
+        true
+      ),
+      temperature: clampNumericSetting(
+        candidate.temperature,
+        contract.limits.generationSettings.temperature,
+        false
+      ),
+      topP: clampNumericSetting(candidate.topP, contract.limits.generationSettings.topP, false),
+      topK: clampNumericSetting(candidate.topK, contract.limits.generationSettings.topK, true),
+      presencePenalty: clampNumericSetting(
+        candidate.presencePenalty,
+        contract.limits.generationSettings.presencePenalty,
+        false
+      ),
+    };
+  }
+
+  function mergeGenerationSettings(current, patch) {
+    const existing =
+      current && typeof current === "object" ? current : GENERATION_SETTINGS_DEFAULTS;
+    const nextPatch = patch && typeof patch === "object" ? patch : {};
+
+    return createGenerationSettings({
+      maxTokens:
+        nextPatch.maxTokens !== undefined ? nextPatch.maxTokens : existing.maxTokens,
+      temperature:
+        nextPatch.temperature !== undefined ? nextPatch.temperature : existing.temperature,
+      topP: nextPatch.topP !== undefined ? nextPatch.topP : existing.topP,
+      topK: nextPatch.topK !== undefined ? nextPatch.topK : existing.topK,
+      presencePenalty:
+        nextPatch.presencePenalty !== undefined
+          ? nextPatch.presencePenalty
+          : existing.presencePenalty,
+    });
+  }
+
+  function cloneGenerationSettings(settings) {
+    return {
+      maxTokens: settings.maxTokens,
+      temperature: settings.temperature,
+      topP: settings.topP,
+      topK: settings.topK,
+      presencePenalty: settings.presencePenalty,
+    };
+  }
+
+  function parseRuntimeContextWindow(payload) {
+    if (!Array.isArray(payload) || !payload[0]) {
+      return null;
+    }
+
+    const contextWindow = Number(payload[0].n_ctx);
+    if (!Number.isFinite(contextWindow) || contextWindow < 1) {
+      return null;
+    }
+
+    return Math.round(contextWindow);
+  }
+
+  function isSupportedStorageSchema(schema) {
+    return schema === undefined || schema === 1 || schema === STORAGE_SCHEMA;
+  }
+
   function createMessage(seed, fallbackCreatedAt) {
     return {
       id: seed && seed.id ? String(seed.id) : makeId("message"),
@@ -93,6 +186,7 @@
         seed && typeof seed.systemPrompt === "string" && seed.systemPrompt.trim()
           ? seed.systemPrompt
           : DEFAULT_SYSTEM_PROMPT,
+      generationSettings: createGenerationSettings(seed && seed.generationSettings),
       draft: seed && typeof seed.draft === "string" ? seed.draft : "",
       messages:
         seed && Array.isArray(seed.messages)
@@ -130,6 +224,7 @@
         typeof candidate.systemPrompt === "string" && candidate.systemPrompt.trim()
           ? candidate.systemPrompt
           : DEFAULT_SYSTEM_PROMPT,
+      generationSettings: createGenerationSettings(candidate.generationSettings),
       draft: typeof candidate.draft === "string" ? candidate.draft : "",
       messages: candidate.messages.map(function (message) {
         return createMessage(message, createdAt);
@@ -151,7 +246,7 @@
       const parsed = JSON.parse(raw);
       if (
         !parsed ||
-        (parsed.schema !== undefined && parsed.schema !== STORAGE_SCHEMA) ||
+        !isSupportedStorageSchema(parsed.schema) ||
         !Array.isArray(parsed.threads) ||
         !parsed.threads.length
       ) {
@@ -201,6 +296,7 @@
       createdAt: thread.createdAt,
       updatedAt: thread.updatedAt,
       systemPrompt: thread.systemPrompt,
+      generationSettings: cloneGenerationSettings(thread.generationSettings),
       draft: thread.draft,
       messages: thread.messages.map(cloneMessage),
     };
@@ -231,6 +327,7 @@
         status: contract.runtimeStatus.CHECKING,
         message: DEFAULT_RUNTIME_MESSAGE,
         modelName: DEFAULT_MODEL_NAME,
+        contextWindow: null,
       },
       request: {
         inFlight: false,
@@ -301,6 +398,7 @@
           status: state.runtime.status,
           message: state.runtime.message,
           modelName: state.runtime.modelName,
+          contextWindow: state.runtime.contextWindow,
         },
         request: {
           inFlight: state.request.inFlight,
@@ -381,6 +479,16 @@
       thread.title = compact.length > 40 ? compact.slice(0, 37) + "..." : compact;
     }
 
+    function findLatestMessageIndex(thread, role) {
+      for (let index = thread.messages.length - 1; index >= 0; index -= 1) {
+        if (thread.messages[index].role === role) {
+          return index;
+        }
+      }
+
+      return -1;
+    }
+
     function flattenMessageContent(content) {
       if (typeof content === "string") {
         return content;
@@ -439,11 +547,20 @@
     }
 
     function buildChatPayload(thread) {
+      const generationSettings =
+        thread && thread.generationSettings
+          ? thread.generationSettings
+          : GENERATION_SETTINGS_DEFAULTS;
+      const behaviorPrompt =
+        thread && typeof thread.systemPrompt === "string" && thread.systemPrompt.trim()
+          ? thread.systemPrompt
+          : DEFAULT_SYSTEM_PROMPT;
+
       return {
         messages: [
           {
             role: "system",
-            content: thread.systemPrompt || DEFAULT_SYSTEM_PROMPT,
+            content: HIDDEN_SAFETY_SYSTEM_PROMPT + "\n\n" + behaviorPrompt,
           },
         ].concat(
           thread.messages.map(function (message) {
@@ -453,13 +570,66 @@
             };
           })
         ),
-        max_tokens: COMPLETION_DEFAULTS.max_tokens,
-        temperature: COMPLETION_DEFAULTS.temperature,
-        top_p: COMPLETION_DEFAULTS.top_p,
-        top_k: COMPLETION_DEFAULTS.top_k,
-        min_p: COMPLETION_DEFAULTS.min_p,
-        presence_penalty: COMPLETION_DEFAULTS.presence_penalty,
+        max_tokens: generationSettings.maxTokens,
+        temperature: generationSettings.temperature,
+        top_p: generationSettings.topP,
+        top_k: generationSettings.topK,
+        min_p: COMPLETION_FIXED_DEFAULTS.minP,
+        presence_penalty: generationSettings.presencePenalty,
       };
+    }
+
+    function syncThreadMutation(thread) {
+      touchThread(thread);
+      sortThreads(state.threads);
+      persistState();
+    }
+
+    function appendAssistantFailure(thread, detail) {
+      thread.messages.push({
+        id: makeId("message"),
+        role: "assistant",
+        content:
+          "The local model could not complete this request. " +
+          "Check that the model is ready and try again.\n\n" +
+          "Details: " +
+          detail,
+        createdAt: nowIso(),
+      });
+      syncThreadMutation(thread);
+    }
+
+    function startAssistantRequest(thread, cause) {
+      if (!fetchImpl) {
+        appendAssistantFailure(thread, "fetch is unavailable in this browser.");
+        emit(contract.events.STATE_CHANGED, cause, {
+          threadId: thread.id,
+          outcome: "error",
+        });
+        return acceptedResult();
+      }
+
+      const controller = new AbortController();
+      const payload = buildChatPayload(thread);
+      state.request.inFlight = true;
+      state.request.threadId = thread.id;
+      state.requestController = controller;
+
+      emit(contract.events.REQUEST_STARTED, cause, {
+        threadId: thread.id,
+      });
+      emit(contract.events.STATE_CHANGED, cause, {
+        threadId: thread.id,
+      });
+
+      void completeRequest({
+        threadId: thread.id,
+        payload: payload,
+        controller: controller,
+        cause: cause,
+      });
+
+      return acceptedResult();
     }
 
     function updateRuntime(nextRuntime, cause, detail) {
@@ -470,11 +640,13 @@
       const changed =
         state.runtime.status !== nextRuntime.status ||
         state.runtime.message !== nextRuntime.message ||
-        state.runtime.modelName !== nextRuntime.modelName;
+        state.runtime.modelName !== nextRuntime.modelName ||
+        state.runtime.contextWindow !== nextRuntime.contextWindow;
 
       state.runtime.status = nextRuntime.status;
       state.runtime.message = nextRuntime.message;
       state.runtime.modelName = nextRuntime.modelName;
+      state.runtime.contextWindow = nextRuntime.contextWindow;
 
       if (changed) {
         emit(contract.events.RUNTIME_CHANGED, cause, detail || null);
@@ -489,6 +661,7 @@
             status: contract.runtimeStatus.ERROR,
             message: DEFAULT_ERROR_MESSAGE,
             modelName: UNAVAILABLE_MODEL_NAME,
+            contextWindow: null,
           },
           cause,
           {
@@ -507,6 +680,7 @@
             state.runtime.modelName === UNAVAILABLE_MODEL_NAME
               ? DEFAULT_MODEL_NAME
               : state.runtime.modelName,
+          contextWindow: state.runtime.contextWindow,
         },
         cause,
         {
@@ -537,17 +711,31 @@
           typeof models.data[0].id === "string"
             ? models.data[0].id
             : FALLBACK_MODEL_NAME;
+        let contextWindow = null;
+
+        try {
+          const slotsResponse = await fetchImpl(ENDPOINTS.slots, {
+            cache: "no-store",
+          });
+          if (slotsResponse.ok) {
+            contextWindow = parseRuntimeContextWindow(await slotsResponse.json());
+          }
+        } catch (error) {
+          contextWindow = null;
+        }
 
         updateRuntime(
           {
             status: contract.runtimeStatus.READY,
             message: DEFAULT_READY_MESSAGE,
             modelName: modelName,
+            contextWindow: contextWindow,
           },
           cause,
           {
             status: contract.runtimeStatus.READY,
             modelName: modelName,
+            contextWindow: contextWindow,
           }
         );
       } catch (error) {
@@ -557,6 +745,7 @@
             status: contract.runtimeStatus.ERROR,
             message: DEFAULT_ERROR_MESSAGE,
             modelName: UNAVAILABLE_MODEL_NAME,
+            contextWindow: null,
           },
           cause,
           {
@@ -608,9 +797,7 @@
             content: content,
             createdAt: nowIso(),
           });
-          touchThread(thread);
-          sortThreads(state.threads);
-          persistState();
+          syncThreadMutation(thread);
         }
 
         if (!clearRequestState(context.controller) || state.destroyed) {
@@ -630,19 +817,10 @@
         const thread = findThread(context.threadId);
 
         if (!aborted && thread) {
-          thread.messages.push({
-            id: makeId("message"),
-            role: "assistant",
-            content:
-              "The local model could not complete this request. " +
-              "Check that the model is ready and try again.\n\n" +
-              "Details: " +
-              (error && error.message ? error.message : "unknown error"),
-            createdAt: nowIso(),
-          });
-          touchThread(thread);
-          sortThreads(state.threads);
-          persistState();
+          appendAssistantFailure(
+            thread,
+            error && error.message ? error.message : "unknown error"
+          );
         }
 
         if (!clearRequestState(context.controller) || state.destroyed) {
@@ -746,6 +924,7 @@
           const forkedThread = createThread({
             title: thread.title + " Fork",
             systemPrompt: thread.systemPrompt,
+            generationSettings: thread.generationSettings,
             draft: thread.draft,
             messages: thread.messages,
           });
@@ -838,6 +1017,103 @@
           return acceptedResult();
         }
 
+        case contract.commands.THREAD_GENERATION_SETTINGS_SET: {
+          const threadId =
+            command.threadId && typeof command.threadId === "string" ? command.threadId : null;
+          const thread = threadId ? findThread(threadId) : null;
+          if (!thread) {
+            return unknownThreadResult(threadId);
+          }
+
+          thread.generationSettings = mergeGenerationSettings(
+            thread.generationSettings,
+            command.settings
+          );
+          touchThread(thread);
+          sortThreads(state.threads);
+          persistState();
+          emit(contract.events.STATE_CHANGED, command.type, {
+            threadId: thread.id,
+          });
+          return acceptedResult();
+        }
+
+        case contract.commands.THREAD_LATEST_USER_MESSAGE_EDIT: {
+          if (state.request.inFlight) {
+            return rejectedResult(contract.errors.BUSY, {
+              type: command.type,
+            });
+          }
+
+          const threadId =
+            command.threadId && typeof command.threadId === "string" ? command.threadId : null;
+          const thread = threadId ? findThread(threadId) : null;
+          if (!thread) {
+            return unknownThreadResult(threadId);
+          }
+
+          const content =
+            typeof command.content === "string" ? command.content.trim() : "";
+          if (!content) {
+            return rejectedResult(contract.errors.EMPTY_DRAFT, {
+              threadId: thread.id,
+            });
+          }
+
+          const latestUserIndex = findLatestMessageIndex(thread, "user");
+          if (latestUserIndex === -1) {
+            return rejectedResult(contract.errors.INVALID_COMMAND, {
+              reason: "latest-user-message-unavailable",
+              threadId: thread.id,
+            });
+          }
+
+          thread.messages = thread.messages.slice(0, latestUserIndex + 1);
+          thread.messages[latestUserIndex] = {
+            id: makeId("message"),
+            role: "user",
+            content: content,
+            createdAt: nowIso(),
+          };
+          thread.draft = "";
+          maybeRetitleThread(thread, content);
+          syncThreadMutation(thread);
+          return startAssistantRequest(thread, command.type);
+        }
+
+        case contract.commands.THREAD_LATEST_ASSISTANT_MESSAGE_REGENERATE: {
+          if (state.request.inFlight) {
+            return rejectedResult(contract.errors.BUSY, {
+              type: command.type,
+            });
+          }
+
+          const threadId =
+            command.threadId && typeof command.threadId === "string" ? command.threadId : null;
+          const thread = threadId ? findThread(threadId) : null;
+          if (!thread) {
+            return unknownThreadResult(threadId);
+          }
+
+          const latestUserIndex = findLatestMessageIndex(thread, "user");
+          const latestAssistantIndex = findLatestMessageIndex(thread, "assistant");
+          if (
+            latestUserIndex === -1 ||
+            latestAssistantIndex === -1 ||
+            latestAssistantIndex !== thread.messages.length - 1 ||
+            latestAssistantIndex <= latestUserIndex
+          ) {
+            return rejectedResult(contract.errors.INVALID_COMMAND, {
+              reason: "latest-assistant-message-unavailable",
+              threadId: thread.id,
+            });
+          }
+
+          thread.messages = thread.messages.slice(0, latestAssistantIndex);
+          syncThreadMutation(thread);
+          return startAssistantRequest(thread, command.type);
+        }
+
         case contract.commands.REQUEST_SEND: {
           if (state.request.inFlight) {
             return rejectedResult(contract.errors.BUSY, {
@@ -869,51 +1145,8 @@
           });
           thread.draft = "";
           maybeRetitleThread(thread, content);
-          touchThread(thread);
-          sortThreads(state.threads);
-          persistState();
-
-          if (!fetchImpl) {
-            thread.messages.push({
-              id: makeId("message"),
-              role: "assistant",
-              content:
-                "The local model could not complete this request. " +
-                "Check that the model is ready and try again.\n\n" +
-                "Details: fetch is unavailable in this browser.",
-              createdAt: nowIso(),
-            });
-            touchThread(thread);
-            sortThreads(state.threads);
-            persistState();
-            emit(contract.events.STATE_CHANGED, command.type, {
-              threadId: thread.id,
-              outcome: "error",
-            });
-            return acceptedResult();
-          }
-
-          const controller = new AbortController();
-          const payload = buildChatPayload(thread);
-          state.request.inFlight = true;
-          state.request.threadId = thread.id;
-          state.requestController = controller;
-
-          emit(contract.events.REQUEST_STARTED, command.type, {
-            threadId: thread.id,
-          });
-          emit(contract.events.STATE_CHANGED, command.type, {
-            threadId: thread.id,
-          });
-
-          void completeRequest({
-            threadId: thread.id,
-            payload: payload,
-            controller: controller,
-            cause: command.type,
-          });
-
-          return acceptedResult();
+          syncThreadMutation(thread);
+          return startAssistantRequest(thread, command.type);
         }
 
         case contract.commands.REQUEST_CANCEL: {
